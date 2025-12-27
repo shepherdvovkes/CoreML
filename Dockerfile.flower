@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Установка зависимостей
+RUN pip install --no-cache-dir flower==2.0.1 redis==5.0.1
+
+# Запуск Flower с использованием переменных окружения
+# CELERY_BROKER_URL должен быть установлен через docker-compose
+CMD sh -c 'celery -A core.celery_app flower --port=5555 --broker=${CELERY_BROKER_URL:-redis://redis:6379/0}'
+
