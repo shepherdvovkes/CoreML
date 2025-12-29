@@ -7,6 +7,8 @@ __pycache__/
 env/
 venv/
 ENV/
+venv
+.venv/
 build/
 develop-eggs/
 dist/
@@ -25,6 +27,13 @@ wheels/
 
 # Environment
 .env
+.env.*
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+.env.staging
 .venv
 
 # IDE
@@ -55,8 +64,6 @@ tmp/
 
 # Backup files
 *.backup
-.env.*.local
-.env.local
 
 # Docker
 .docker/
@@ -105,4 +112,43 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Flutter/Dart
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/.pub-cache/
+flutter_app/.pub/
+flutter_app/build/
+flutter_app/.ios/
+flutter_app/.android/
+flutter_app/.macos/
+flutter_app/*.iml
+flutter_app/*.dmg
+flutter_app/*.app
+flutter_app/*.ipa
+flutter_app/*.apk
+flutter_app/*.aab
+flutter_app/*.log
+
+# PDF test files
+*.pdf
+*.PDF
+!flutter_app/macos/Runner/Assets.xcassets/AppIcon.appiconset/*.pdf
+
+# DKIM private keys
+dkim.private
+*.private
+
+# Docker backup files
+docker-compose.yml~
+docker-compose.*.yml~
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Flower
+flower.pid
 
