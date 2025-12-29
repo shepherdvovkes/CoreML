@@ -497,3 +497,5 @@ pip install -r requirements.txt
 - [Resilience Patterns Overview](https://docs.microsoft.com/en-us/azure/architecture/patterns/category/resiliency)
 - [Circuit Breaker Pattern](https://martinfowler.com/bliki/CircuitBreaker.html)
 
+
+

@@ -2,7 +2,7 @@
 Основной API сервер для CoreML_RAG_MCP_Prompt (Stateless)
 """
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from typing import Optional, List
 from loguru import logger
@@ -69,12 +69,19 @@ class QueryRequest(BaseModel):
     use_law: Optional[bool] = None
 
 
+class SuggestedAction(BaseModel):
+    id: str
+    label: str
+    type: str = "action"
+
+
 class QueryResponse(BaseModel):
     answer: str
     sources: List[str]
     model: Optional[str] = None
     usage: Optional[dict] = None
     metadata: Optional[dict] = None
+    suggested_actions: Optional[List[SuggestedAction]] = None
 
 
 @app.on_event("startup")
@@ -187,7 +194,17 @@ async def query(
             use_law=request.use_law
         )
         
+        # Преобразуем suggested_actions в SuggestedAction объекты, если они есть
+        if result.get("suggested_actions"):
+            result["suggested_actions"] = [
+                SuggestedAction(**action) if isinstance(action, dict) else action
+                for action in result["suggested_actions"]
+            ]
+        
         return QueryResponse(**result)
+    except HTTPException:
+        # Пробрасываем HTTPException как есть
+        raise
     except Exception as e:
         logger.error(f"Error processing query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -230,6 +247,9 @@ async def query_stream(
                 yield chunk
         
         return StreamingResponse(generate(), media_type="text/plain")
+    except HTTPException:
+        # Пробрасываем HTTPException как есть
+        raise
     except Exception as e:
         logger.error(f"Error streaming query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -326,28 +346,30 @@ async def add_documents_batch(files: List[UploadFile] = File(...)):
         files: Список загружаемых файлов
         
     Returns:
-        Результат с task_id для отслеживания статуса
+        Результат со списком task_id для каждого документа
     """
     try:
-        documents = []
+        # Создаем отдельные задачи для каждого документа
+        # Это позволяет фронтенду отслеживать статус каждого документа отдельно
+        individual_tasks = []
         for file in files:
             content = await file.read()
-            documents.append({
-                "file_path": None,
-                "file_content": content,
-                "filename": file.filename,
-                "metadata": {"filename": file.filename}
+            task = process_document_task.delay(
+                file_path=None,
+                file_content=content,
+                filename=file.filename,
+                metadata={"filename": file.filename, "uploaded_at": "now"}
+            )
+            individual_tasks.append({
+                "task_id": task.id,
+                "filename": file.filename
             })
-        
-        # Запуск пакетной задачи
-        task = process_documents_batch_task.delay(documents)
         
         return {
             "status": "queued",
-            "task_id": task.id,
-            "total_documents": len(documents),
-            "message": f"{len(documents)} documents queued for processing",
-            "check_status_url": f"/rag/task/{task.id}"
+            "total_documents": len(individual_tasks),
+            "message": f"{len(individual_tasks)} documents queued for processing",
+            "results": individual_tasks  # Список task_id для каждого документа
         }
     except Exception as e:
         logger.error(f"Error queuing documents batch: {e}")
@@ -376,6 +398,91 @@ async def rag_search(
         return {"query": query, "results": results}
     except Exception as e:
         logger.error(f"Error searching RAG: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/rag/documents")
+async def list_documents(
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    """
+    Получение списка всех загруженных документов
+    
+    Args:
+        rag_service: RAG сервис (stateless, создается через DI)
+        
+    Returns:
+        Список документов с метаданными
+    """
+    try:
+        documents = await rag_service.list_documents()
+        return {
+            "total": len(documents),
+            "documents": documents
+        }
+    except Exception as e:
+        logger.error(f"Error listing documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/rag/documents/{filename}/chunks")
+async def get_document_chunks(
+    filename: str,
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    """
+    Получение всех чанков документа по имени файла
+    
+    Args:
+        filename: Имя файла документа
+        rag_service: RAG сервис (stateless, создается через DI)
+        
+    Returns:
+        Список чанков документа с текстом и метаданными
+    """
+    try:
+        chunks = await rag_service.get_document_chunks(filename)
+        return {
+            "filename": filename,
+            "chunks_count": len(chunks),
+            "chunks": chunks
+        }
+    except Exception as e:
+        logger.error(f"Error getting document chunks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/rag/documents/{filename}/preview")
+async def get_document_preview(
+    filename: str,
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    """
+    Получение изображения первой страницы документа (превью)
+    
+    Args:
+        filename: Имя файла документа
+        rag_service: RAG сервис (stateless, создается через DI)
+        
+    Returns:
+        Изображение PNG первой страницы документа
+    """
+    try:
+        image_bytes = await rag_service.get_document_preview_image(filename)
+        if image_bytes is None:
+            raise HTTPException(status_code=404, detail="Preview image not available for this document")
+        
+        return Response(
+            content=image_bytes,
+            media_type="image/png",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}_preview.png"'
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting document preview: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -426,8 +533,73 @@ async def get_case(
         if not details:
             raise HTTPException(status_code=404, detail="Case not found")
         return details
+    except HTTPException:
+        # Пробрасываем HTTPException как есть
+        raise
     except Exception as e:
         logger.error(f"Error getting case: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/llm/providers")
+async def get_llm_providers():
+    """
+    Получение списка доступных LLM провайдеров
+    
+    Returns:
+        Список провайдеров с их конфигурацией
+    """
+    try:
+        from core.llm.factory import LLMProviderFactory
+        providers = LLMProviderFactory.get_available_providers()
+        return {
+            "providers": providers,
+            "default_provider": settings.default_llm_provider.value
+        }
+    except Exception as e:
+        logger.error(f"Error getting providers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/llm/providers/{provider_name}/validate")
+async def validate_llm_provider(
+    provider_name: str,
+    model: Optional[str] = Query(None)
+):
+    """
+    Проверка валидности LLM провайдера
+    
+    Args:
+        provider_name: Имя провайдера (openai, ollama, lmstudio, custom)
+        model: Название модели (опционально)
+        
+    Returns:
+        Результат проверки валидности
+    """
+    try:
+        from core.llm.factory import LLMProviderFactory
+        
+        # Преобразуем строку в enum
+        try:
+            provider_type = LLMProvider(provider_name.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown provider: {provider_name}. Available: {[p.value for p in LLMProvider]}"
+            )
+        
+        # Проверяем валидность
+        result = await LLMProviderFactory.validate_provider(provider_type, model)
+        
+        return {
+            "provider": provider_name,
+            "model": model,
+            **result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating provider: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

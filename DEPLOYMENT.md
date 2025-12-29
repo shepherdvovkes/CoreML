@@ -319,3 +319,5 @@ redis-cli --rdb /backup/redis-20240101.rdb
 tar -czf backup-vector-db.tar.gz data/vector_db/
 ```
 
+
+

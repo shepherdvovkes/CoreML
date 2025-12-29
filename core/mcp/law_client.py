@@ -13,11 +13,9 @@ class LawMCPClient:
     
     def __init__(self):
         self.base_url = settings.mcp_law_server_url
-        self.api_key = settings.mcp_law_api_key
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             headers={
-                "Authorization": f"Bearer {self.api_key}" if self.api_key else None,
                 "Content-Type": "application/json"
             },
             timeout=30.0
@@ -43,7 +41,7 @@ class LawMCPClient:
         """
         try:
             response = await self.client.post(
-                "/mcp/zakononline/search_cases",
+                "/v1/mcp/search_cases",
                 json={
                     "query": query,
                     "instance": instance,
@@ -51,7 +49,12 @@ class LawMCPClient:
                 }
             )
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            # Сервер возвращает {'success': True, 'results': [...]}
+            if isinstance(data, dict) and "results" in data:
+                return data["results"]
+            # Если формат другой, возвращаем как есть
+            return data if isinstance(data, list) else []
         except Exception as e:
             logger.error(f"Error searching cases: {e}")
             return []
@@ -80,7 +83,7 @@ class LawMCPClient:
                 params["docId"] = doc_id
             
             response = await self.client.post(
-                "/mcp/zakononline/get_case_details",
+                "/v1/mcp/get_case_details",
                 json=params
             )
             response.raise_for_status()
@@ -119,7 +122,7 @@ class LawMCPClient:
                 payload["year"] = year
             
             response = await self.client.post(
-                "/mcp/zakononline/extract_case_arguments",
+                "/v1/mcp/extract_case_arguments",
                 json=payload
             )
             response.raise_for_status()

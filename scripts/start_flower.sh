@@ -14,3 +14,5 @@ celery -A core.celery_app flower \
     --broker=redis://localhost:6379/0 \
     --backend=redis://localhost:6379/0
 
+
+

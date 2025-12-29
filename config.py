@@ -2,7 +2,7 @@
 Конфигурация сервиса CoreML_RAG_MCP_Prompt
 """
 from pydantic_settings import BaseSettings
-from typing import Literal
+from typing import Literal, Optional
 from enum import Enum
 
 
@@ -11,6 +11,7 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     LMSTUDIO = "lmstudio"
     CUSTOM = "custom"
+    OLLAMA = "ollama"
 
 
 class Settings(BaseSettings):
@@ -21,7 +22,9 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     lmstudio_base_url: str = "http://localhost:1234/v1"
     custom_llm_base_url: str = "http://localhost:8000/v1"
-    default_llm_provider: LLMProvider = LLMProvider.OPENAI
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "deepseek-v3.1:671b-cloud"  # Default Ollama model, can be overridden
+    default_llm_provider: LLMProvider = LLMProvider.OLLAMA
     
     # RAG Configuration
     rag_vector_db_path: str = "./data/vector_db"  # Для локальной ChromaDB (fallback)
@@ -38,8 +41,17 @@ class Settings(BaseSettings):
     qdrant_timeout: int = 30
     
     # MCP Configuration
-    mcp_law_server_url: str = "http://localhost:3000"
-    mcp_law_api_key: str = ""
+    mcp_law_server_url: str = "https://mcp.lexapp.co.ua/mcp"
+    
+    # Google Vision API Configuration
+    vision_api_url: str = "http://mail.s0me.uk:3006"
+    vision_api_key: str = ""
+    vision_api_timeout: int = 120  # 2 minutes for OCR processing
+    
+    # Text Post-Processing with LLM
+    use_llm_text_cleaning: bool = True  # Використовувати LLM для очищення тексту після OCR
+    llm_text_cleaning_provider: LLMProvider = LLMProvider.OLLAMA  # Провайдер для очищення тексту
+    llm_text_cleaning_model: Optional[str] = None  # Модель для очищення (None = використовувати default для провайдера)
     
     # Server Configuration
     api_host: str = "0.0.0.0"
@@ -59,7 +71,7 @@ class Settings(BaseSettings):
     celery_task_soft_time_limit: int = 240  # 4 minutes
     
     # Redis Configuration
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://localhost:6379/0"  # Для локальной работы используйте localhost, для Docker - redis
     redis_cache_ttl: int = 3600  # 1 hour
     
     # MLflow Configuration
@@ -90,6 +102,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Игнорировать дополнительные поля из .env
 
 
 settings = Settings()

@@ -2,8 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Установка зависимостей
-RUN pip install --no-cache-dir flower==2.0.1 redis==5.0.1
+# Копирование файлов зависимостей
+COPY requirements.txt .
+
+# Установка зависимостей (включая все необходимые для импорта core.celery_app)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Копирование кода приложения (нужно для импорта core.celery_app)
+COPY . .
 
 # Запуск Flower с использованием переменных окружения
 # CELERY_BROKER_URL должен быть установлен через docker-compose

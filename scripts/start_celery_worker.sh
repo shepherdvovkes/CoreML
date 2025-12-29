@@ -16,3 +16,5 @@ celery -A core.celery_app worker \
     --time-limit=300 \
     --soft-time-limit=240
 
+
+

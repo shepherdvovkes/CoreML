@@ -79,20 +79,23 @@ def process_document_task(
         
         # Обработка документа
         logger.info(f"Processing document: {file_path}")
-        rag_service.add_document(file_path, metadata=metadata)
+        add_result = rag_service.add_document(file_path, metadata=metadata)
         
         # Очистка временного файла
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         
+        # Формируем результат с информацией из add_document
         result = {
-            "status": "success",
+            "status": add_result.get("status", "success"),
             "file_path": file_path,
             "filename": filename or os.path.basename(file_path),
-            "message": "Document processed and added to RAG system"
+            "message": add_result.get("message", "Document processed and added to RAG system"),
+            "chunks_count": add_result.get("chunks_count", 0),
+            "collections": add_result.get("collections", [])
         }
         
-        logger.info(f"Document processed successfully: {result['filename']}")
+        logger.info(f"Document processed successfully: {result['filename']} - {result.get('chunks_count', 0)} chunks in {result.get('collections', [])}")
         return result
         
     except Exception as exc:

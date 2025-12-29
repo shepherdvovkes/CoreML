@@ -38,3 +38,5 @@ celery_app.conf.update(
 
 logger.info(f"Celery configured with broker: {settings.celery_broker_url}")
 
+
+

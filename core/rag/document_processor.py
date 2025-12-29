@@ -2,6 +2,9 @@
 Обработчик документов для RAG с использованием LangChain loaders и splitters
 """
 import os
+import asyncio
+import io
+import re
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from loguru import logger
@@ -22,20 +25,87 @@ except ImportError as e:
     logger.warning(f"LangChain not fully available: {e}. Falling back to basic implementations.")
     LANGCHAIN_AVAILABLE = False
     LangChainDocument = None
-    # Fallback imports для обратной совместимости
-    try:
-        import PyPDF2
-        from docx import Document
-        import openpyxl
-    except ImportError:
-        pass
+
+# Fallback imports для обратной совместимости (всегда импортируем, даже если LangChain доступен)
+PyPDF2 = None
+pypdf = None
+Document = None
+openpyxl = None
+
+# Пробуем импортировать PyPDF2 (старая версия)
+try:
+    import PyPDF2
+except (ImportError, NameError):
+    PyPDF2 = None
+
+# Пробуем импортировать pypdf (новая версия PyPDF2)
+try:
+    import pypdf
+    # Если pypdf доступен, используем его как PyPDF2 для совместимости
+    if PyPDF2 is None:
+        PyPDF2 = pypdf
+except (ImportError, NameError):
+    pass
+
+try:
+    from docx import Document
+except ImportError:
+    Document = None
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+
+# Импорты для Vision API и конвертации PDF
+try:
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
+except ImportError:
+    PYMUPDF_AVAILABLE = False
+    fitz = None
+
+try:
+    from PIL import Image
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
+    Image = None
+
+# Импорт Vision API клиента
+try:
+    from .vision_client import VisionAPIClient
+    VISION_CLIENT_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Vision client not available: {e}")
+    VISION_CLIENT_AVAILABLE = False
+    VisionAPIClient = None
+
+# Импорт LLM для очистки текста
+try:
+    from core.llm.factory import LLMProviderFactory
+    from core.llm.base import LLMMessage
+    from config import LLMProvider
+    LLM_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"LLM not available for text cleaning: {e}")
+    LLM_AVAILABLE = False
+    LLMProviderFactory = None
+    LLMMessage = None
+    LLMProvider = None
 
 
 class DocumentProcessor:
     """Класс для обработки различных типов документов с использованием LangChain"""
     
-    def __init__(self):
-        """Инициализация процессора документов"""
+    def __init__(self, use_vision_api: bool = True, use_llm_cleaning: bool = None):
+        """
+        Инициализация процессора документов
+        
+        Args:
+            use_vision_api: Использовать Google Vision API для извлечения текста (по умолчанию True)
+            use_llm_cleaning: Использовать LLM для очистки текста (по умолчанию из settings)
+        """
         # Инициализация text splitter из LangChain
         if LANGCHAIN_AVAILABLE:
             self.text_splitter = RecursiveCharacterTextSplitter(
@@ -46,6 +116,226 @@ class DocumentProcessor:
             )
         else:
             self.text_splitter = None
+        
+        # Инициализация Vision API клиента
+        self.use_vision_api = use_vision_api and VISION_CLIENT_AVAILABLE
+        if self.use_vision_api:
+            try:
+                self.vision_client = VisionAPIClient()
+                if not self.vision_client.is_available():
+                    logger.warning("Vision API client initialized but API key is not set. Will use fallback methods.")
+                    self.use_vision_api = False
+                else:
+                    logger.info("Vision API client initialized and ready to use")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Vision API client: {e}. Will use fallback methods.")
+                self.use_vision_api = False
+        else:
+            self.vision_client = None
+        
+        # Инициализация LLM для очистки текста
+        self.use_llm_cleaning = use_llm_cleaning if use_llm_cleaning is not None else settings.use_llm_text_cleaning
+        self.llm_provider = None
+        if self.use_llm_cleaning and LLM_AVAILABLE:
+            try:
+                provider_type = settings.llm_text_cleaning_provider
+                model = settings.llm_text_cleaning_model
+                self.llm_provider = LLMProviderFactory.get_provider(provider_type, model)
+                logger.info(f"LLM text cleaning enabled using {provider_type.value} with model {self.llm_provider.model}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LLM for text cleaning: {e}. Will use basic filtering.")
+                self.use_llm_cleaning = False
+    
+    @staticmethod
+    def _clean_ocr_text(text: str) -> str:
+        """
+        Очистка тексту від технічної інформації про PDF/OCR
+        
+        Видаляє:
+        - Метадані PDF (Creator, Producer, CreationDate тощо)
+        - Технічні рядки про розпізнавання
+        - Артефакти OCR
+        - Зайві пробіли та переноси рядків
+        """
+        if not text:
+            return text
+        
+        # Видаляємо рядки з метаданими PDF
+        lines = text.split('\n')
+        cleaned_lines = []
+        
+        # Патерни для технічної інформації
+        technical_patterns = [
+            r'^PDF\s+Version',
+            r'^Creator:',
+            r'^Producer:',
+            r'^CreationDate:',
+            r'^ModDate:',
+            r'^Title:',
+            r'^Author:',
+            r'^Subject:',
+            r'^Keywords:',
+            r'^Trapped:',
+            r'^/Type\s+/',
+            r'^/Subtype\s+/',
+            r'^/Filter\s+/',
+            r'^/Length\s+',
+            r'^/Width\s+',
+            r'^/Height\s+',
+            r'^/ColorSpace\s+',
+            r'^/BitsPerComponent\s+',
+            r'^xref',
+            r'^trailer',
+            r'^startxref',
+            r'^%%EOF',
+            r'^/Page\s+',
+            r'^/Pages\s+',
+            r'^/MediaBox\s+',
+            r'^/CropBox\s+',
+            r'^/Rotate\s+',
+            r'^/Parent\s+',
+            r'^/Resources\s+',
+            r'^/Font\s+',
+            r'^/XObject\s+',
+            r'^/ProcSet\s+',
+            r'^/Contents\s+',
+            r'OCR\s+confidence',
+            r'Recognition\s+confidence',
+            r'Text\s+extraction',
+            r'Page\s+\d+\s+of\s+\d+',
+            # Тестові рядки OCR
+            r'This\s+is\s+text\s+in\s+English\s+for\s+OCR',
+            r'for\s+OCR\s+recognition',
+            r'OCR\s+recognition',
+            r'Vision\s+API',
+            r'Google\s+Vision\s+API',
+            # Технічні описи документів
+            r'PDF-файл[и]?\s+з\s+текстом',
+            r'PDF-файл[и]?\s+с\s+текстом',
+            r'PDF\s+файл[и]?\s+з\s+текстом',
+            r'PDF\s+файл[и]?\s+с\s+текстом',
+            r'для\s+распознавания\s+OCR',
+            r'для\s+розпізнавання\s+OCR',
+            r'документ[и]?\s+являются\s+PDF',
+            r'документ[и]?\s+є\s+PDF',
+            r'английском\s+языке\s+для\s+распознавания',
+            r'англійською\s+мовою\s+для\s+розпізнавання',
+            # Артефакти OCR (рядки з тільки крапками/символами)
+            r'^[\.\s]+$',
+            r'^[\-\s]+$',
+            r'^[_\s]+$',
+            r'^[=\s]+$',
+        ]
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Перевіряємо, чи не є рядок технічною інформацією
+            is_technical = False
+            for pattern in technical_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    is_technical = True
+                    break
+            
+            # Пропускаємо рядки, які виглядають як технічні команди PDF
+            if line.startswith('/') and len(line) < 50:
+                is_technical = True
+            
+            # Пропускаємо рядки з тільки цифрами та спецсимволами
+            if re.match(r'^[\d\s/\\\[\](){}<>]+$', line) and len(line) < 30:
+                is_technical = True
+            
+            # Пропускаємо дуже короткі рядки (менше 3 символів) - часто артефакти OCR
+            if len(line) < 3:
+                is_technical = True
+            
+            # Пропускаємо рядки, які містять тільки повторювані символи
+            if len(line) > 0 and len(set(line.replace(' ', ''))) <= 2 and len(line) < 20:
+                is_technical = True
+            
+            # Пропускаємо рядки з великою кількістю спецсимволів (більше 50%)
+            if len(line) > 0:
+                special_chars = len(re.findall(r'[^\w\s\u0400-\u04FF]', line))
+                if special_chars / len(line) > 0.5:
+                    is_technical = True
+            
+            if not is_technical:
+                cleaned_lines.append(line)
+        
+        # Об'єднуємо рядки та очищаємо зайві пробіли
+        cleaned_text = '\n'.join(cleaned_lines)
+        
+        # Видаляємо множинні пробіли
+        cleaned_text = re.sub(r' +', ' ', cleaned_text)
+        
+        # Видаляємо множинні переноси рядків (більше 2 підряд)
+        cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text)
+        
+        return cleaned_text.strip()
+    
+    async def _clean_text_with_llm(self, text: str) -> str:
+        """
+        Очистка та структурування тексту через LLM (Ollama)
+        
+        Args:
+            text: Текст для очищення
+            
+        Returns:
+            Очищений та структурований текст
+        """
+        if not self.use_llm_cleaning or not self.llm_provider:
+            return text
+        
+        if not text or not text.strip():
+            return text
+        
+        try:
+            # Промпт для очищення та структурування тексту
+            system_prompt = """Ти - експерт з обробки документів. Твоя задача - очистити та структурувати текст, який був розпізнаний через OCR з PDF документів.
+
+Ти маєш:
+1. Видалити всю технічну інформацію про PDF (метадані, команди PDF, технічні рядки)
+2. Видалити артефакти OCR (рядки з тільки символами, повторювані символи)
+3. Видалити тестові рядки типу "This is text in English for OCR recognition"
+4. Зберегти тільки корисний юридичний/бізнесовий зміст
+5. Правильно структурувати текст (заголовки, параграфи, списки)
+6. Виправити очевидні помилки розпізнавання
+7. Зберегти оригінальну мову тексту (українська, російська, англійська)
+
+Поверни тільки очищений та структурований текст, без додаткових пояснень."""
+
+            user_prompt = f"""Очисти та структуруй наступний текст, який був розпізнаний через OCR:
+
+{text[:8000]}"""  # Обмежуємо до 8000 символів для промпту
+            
+            messages = [
+                LLMMessage(role="system", content=system_prompt),
+                LLMMessage(role="user", content=user_prompt)
+            ]
+            
+            logger.info(f"[DocumentProcessor] Cleaning text with LLM ({self.llm_provider.model})...")
+            response = await self.llm_provider.generate(
+                messages,
+                temperature=0.3,  # Низька температура для більш точного результату
+                max_tokens=10000
+            )
+            
+            cleaned_text = response.content.strip()
+            
+            if cleaned_text and len(cleaned_text) > 0:
+                logger.info(f"[DocumentProcessor] LLM cleaned text: {len(text)} -> {len(cleaned_text)} characters")
+                return cleaned_text
+            else:
+                logger.warning("[DocumentProcessor] LLM returned empty text, using original")
+                return text
+                
+        except Exception as e:
+            logger.error(f"[DocumentProcessor] Error cleaning text with LLM: {e}")
+            logger.debug(f"Falling back to basic filtering")
+            # Fallback на базову фільтрацію
+            return DocumentProcessor._clean_ocr_text(text)
     
     @staticmethod
     def _load_with_langchain(file_path: str) -> Optional[str]:
@@ -71,79 +361,400 @@ class DocumentProcessor:
             # Загрузка документов
             documents = loader.load()
             
+            if not documents:
+                logger.warning(f"LangChain loader returned no documents for {file_path}")
+                return None
+            
             # Объединение всех страниц/частей в один текст
-            text = "\n\n".join([doc.page_content for doc in documents])
+            text = "\n\n".join([doc.page_content for doc in documents if doc.page_content])
+            
+            if not text or not text.strip():
+                logger.warning(f"LangChain loader returned empty text for {file_path}")
+                return None
+            
             return text
             
         except Exception as e:
             logger.error(f"Error loading document with LangChain {file_path}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return None
     
-    @staticmethod
-    def extract_text_from_pdf(file_path: str) -> str:
-        """Извлечение текста из PDF (с fallback на PyPDF2)"""
-        # Пробуем LangChain loader
-        text = DocumentProcessor._load_with_langchain(file_path)
-        if text is not None:
-            return text
+    def _pdf_to_images(self, file_path: str) -> List[bytes]:
+        """
+        Конвертация PDF в список изображений (байты)
         
-        # Fallback на старую реализацию
-        if not LANGCHAIN_AVAILABLE:
+        Args:
+            file_path: Путь к PDF файлу
+            
+        Returns:
+            Список байтов изображений (PNG)
+        """
+        if not PYMUPDF_AVAILABLE:
+            logger.warning("PyMuPDF is not available. Cannot convert PDF to images.")
+            return []
+        
+        try:
+            images = []
+            doc = fitz.open(file_path)
+            
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                # Конвертируем страницу в изображение с высоким разрешением
+                mat = fitz.Matrix(2.0, 2.0)  # Увеличиваем разрешение в 2 раза
+                pix = page.get_pixmap(matrix=mat)
+                
+                # Конвертируем в PNG байты
+                img_bytes = pix.tobytes("png")
+                images.append(img_bytes)
+                logger.debug(f"Converted page {page_num + 1} to image: {len(img_bytes)} bytes")
+            
+            doc.close()
+            logger.info(f"Converted PDF to {len(images)} images")
+            return images
+            
+        except Exception as e:
+            logger.error(f"Error converting PDF to images: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return []
+    
+    def _extract_text_via_vision_api(self, file_path: str) -> Optional[str]:
+        """
+        Извлечение текста через Vision API (синхронная обертка)
+        
+        Args:
+            file_path: Путь к файлу
+            
+        Returns:
+            Извлеченный текст или None
+        """
+        if not self.use_vision_api or not self.vision_client:
+            logger.debug(f"Vision API not available or client not initialized")
+            return None
+        
+        logger.info(f"[DocumentProcessor] Starting Vision API extraction for file: {file_path}")
+        
+        try:
+            # Запускаем асинхронный метод в синхронном контексте
+            # В Celery tasks обычно нет event loop, поэтому используем asyncio.run()
             try:
-                text = ""
-                with open(file_path, 'rb') as file:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Если цикл уже запущен (редкий случай), используем ThreadPoolExecutor
+                    logger.debug(f"[DocumentProcessor] Event loop is running, using ThreadPoolExecutor")
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(
+                            lambda: asyncio.run(self.vision_client.extract_text_from_file(file_path))
+                        )
+                        result = future.result(timeout=settings.vision_api_timeout + 10)
+                        logger.info(f"[DocumentProcessor] Vision API extraction completed, result: {'success' if result is not None else 'failed'}")
+                        return result
+                else:
+                    # Loop существует, но не запущен
+                    logger.debug(f"[DocumentProcessor] Event loop exists but not running, using run_until_complete")
+                    result = loop.run_until_complete(
+                        self.vision_client.extract_text_from_file(file_path)
+                    )
+                    logger.info(f"[DocumentProcessor] Vision API extraction completed, result: {'success' if result is not None else 'failed'}")
+                    return result
+            except RuntimeError:
+                # Нет event loop (обычный случай в Celery tasks)
+                logger.debug(f"[DocumentProcessor] No event loop, using asyncio.run()")
+                result = asyncio.run(
+                    self.vision_client.extract_text_from_file(file_path)
+                )
+                logger.info(f"[DocumentProcessor] Vision API extraction completed, result: {'success' if result is not None else 'failed'}")
+                return result
+        except Exception as e:
+            logger.error(f"[DocumentProcessor] Error extracting text via Vision API: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
+    
+    def _extract_text_from_pdf_via_vision(self, file_path: str) -> Optional[str]:
+        """
+        Извлечение текста из PDF через Vision API (конвертация страниц в изображения)
+        
+        Args:
+            file_path: Путь к PDF файлу
+            
+        Returns:
+            Извлеченный текст или None
+        """
+        if not self.use_vision_api or not self.vision_client:
+            return None
+        
+        try:
+            # Конвертируем PDF в изображения
+            images = self._pdf_to_images(file_path)
+            if not images:
+                logger.warning("Failed to convert PDF to images")
+                return None
+            
+            # Отправляем каждое изображение в Vision API и собираем текст
+            all_text = []
+            
+            for i, image_bytes in enumerate(images):
+                logger.info(f"[DocumentProcessor] Processing PDF page {i + 1}/{len(images)} via Vision API (size: {len(image_bytes)} bytes)")
+                
+                try:
+                    # Запускаем асинхронный метод
+                    # В Celery tasks нет event loop, поэтому всегда используем asyncio.run()
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # Если loop уже запущен (редкий случай), используем ThreadPoolExecutor
+                            logger.debug(f"[DocumentProcessor] Sending page {i + 1} image to Vision API (event loop running)")
+                            import concurrent.futures
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                future = executor.submit(
+                                    lambda: asyncio.run(
+                                        self.vision_client.extract_text_from_image(
+                                            image_bytes, 
+                                            filename=f"page_{i+1}.png"
+                                        )
+                                    )
+                                )
+                                page_text = future.result(timeout=settings.vision_api_timeout + 10)
+                        else:
+                            # Loop существует, но не запущен
+                            logger.debug(f"[DocumentProcessor] Sending page {i + 1} image to Vision API (using existing loop)")
+                            page_text = loop.run_until_complete(
+                                self.vision_client.extract_text_from_image(
+                                    image_bytes,
+                                    filename=f"page_{i+1}.png"
+                                )
+                            )
+                    except RuntimeError:
+                        # Нет event loop (обычный случай в Celery tasks)
+                        logger.debug(f"[DocumentProcessor] Sending page {i + 1} image to Vision API (no event loop, using asyncio.run)")
+                        page_text = asyncio.run(
+                            self.vision_client.extract_text_from_image(
+                                image_bytes,
+                                filename=f"page_{i+1}.png"
+                            )
+                        )
+                    
+                    # page_text может быть None (ошибка) или строкой (включая пустую строку)
+                    if page_text is not None:
+                        if page_text.strip():
+                            all_text.append(page_text)
+                            logger.debug(f"Extracted {len(page_text)} characters from page {i + 1}")
+                        else:
+                            # Пустая строка - страница без текста, это валидный результат
+                            logger.debug(f"Page {i + 1} contains no text (empty OCR result)")
+                    else:
+                        # None означает ошибку при обработке страницы
+                        logger.warning(f"Failed to extract text from page {i + 1} via Vision API")
+                        
+                except Exception as page_error:
+                    logger.warning(f"Error processing page {i + 1} via Vision API: {page_error}")
+                    continue
+            
+            if all_text:
+                combined_text = "\n\n".join(all_text)
+                logger.info(f"Successfully extracted text from PDF via Vision API: {len(combined_text)} characters from {len(images)} pages")
+                # Спочатку базова фільтрація
+                cleaned_text = DocumentProcessor._clean_ocr_text(combined_text)
+                if cleaned_text != combined_text:
+                    logger.info(f"Basic filtering: removed {len(combined_text) - len(cleaned_text)} characters of technical metadata")
+                
+                # Потім очищення через LLM, якщо увімкнено
+                if self.use_llm_cleaning and self.llm_provider:
+                    try:
+                        # Використовуємо синхронну обгортку для асинхронного методу
+                        try:
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                # Якщо loop вже запущений, використовуємо ThreadPoolExecutor
+                                import concurrent.futures
+                                with concurrent.futures.ThreadPoolExecutor() as executor:
+                                    future = executor.submit(
+                                        lambda: asyncio.run(self._clean_text_with_llm(cleaned_text))
+                                    )
+                                    cleaned_text = future.result(timeout=120)
+                            else:
+                                cleaned_text = loop.run_until_complete(self._clean_text_with_llm(cleaned_text))
+                        except RuntimeError:
+                            cleaned_text = asyncio.run(self._clean_text_with_llm(cleaned_text))
+                    except Exception as e:
+                        logger.warning(f"LLM cleaning failed: {e}, using basic filtered text")
+                
+                return cleaned_text
+            else:
+                logger.warning("No text extracted from PDF via Vision API")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error extracting text from PDF via Vision API: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
+    
+    def extract_text_from_pdf(self, file_path: str) -> str:
+        """Извлечение текста из PDF (с использованием Vision API и fallback на LangChain/PyPDF2)"""
+        logger.info(f"Extracting text from PDF: {file_path}")
+        
+        # Сначала пробуем Vision API, если доступен
+        if self.use_vision_api:
+            logger.info(f"[DocumentProcessor] Attempting to extract text from PDF using Vision API: {file_path}")
+            try:
+                text = self._extract_text_from_pdf_via_vision(file_path)
+                # Проверяем результат: None означает ошибку, пустая строка - валидный результат (нет текста)
+                if text is not None:
+                    if text.strip():
+                        logger.info(f"[DocumentProcessor] Successfully extracted text from PDF using Vision API: {len(text)} characters")
+                        return text
+                    else:
+                        # Пустая строка от Vision API - возможно, PDF не содержит текста
+                        # Но попробуем fallback, так как Vision API мог пропустить текст
+                        logger.warning(f"[DocumentProcessor] Vision API returned empty text for PDF (may not contain text or OCR failed), trying fallback methods")
+                else:
+                    # None означает ошибку при обработке
+                    logger.warning(f"[DocumentProcessor] Vision API failed to process PDF, trying fallback methods")
+            except Exception as e:
+                logger.warning(f"[DocumentProcessor] Vision API failed for {file_path}: {e}, trying fallback methods")
+                import traceback
+                logger.debug(traceback.format_exc())
+        
+        # Пробуем LangChain loader
+        if LANGCHAIN_AVAILABLE:
+            logger.info("Attempting to extract text using LangChain PyPDFLoader...")
+            try:
+                text = DocumentProcessor._load_with_langchain(file_path)
+                if text and text.strip():  # Проверяем, что текст не пустой
+                    logger.info(f"Successfully extracted text from PDF using LangChain: {len(text)} characters")
+                    return text
+                else:
+                    logger.warning(f"LangChain extracted empty text, trying PyPDF2 fallback")
+            except Exception as e:
+                logger.warning(f"LangChain PDF loader failed for {file_path}: {e}, trying fallback")
+                import traceback
+                logger.debug(traceback.format_exc())
+        else:
+            logger.warning("LangChain is not available, using PyPDF2 fallback")
+        
+        # Fallback на PyPDF2/pypdf (работает даже если LangChain доступен, но не смог извлечь текст)
+        if PyPDF2 is None:
+            logger.error("PyPDF2/pypdf is not installed. Cannot extract text from PDF.")
+            logger.error("Please install PyPDF2 or pypdf: pip install PyPDF2 or pip install pypdf")
+            return ""
+        
+        try:
+            text = ""
+            with open(file_path, 'rb') as file:
+                # Используем PyPDF2 или pypdf (они совместимы по API)
+                try:
                     pdf_reader = PyPDF2.PdfReader(file)
-                    for page in pdf_reader.pages:
-                        text += page.extract_text() + "\n"
-                return text
-            except Exception as e:
-                logger.error(f"Error extracting text from PDF {file_path}: {e}")
-                return ""
-        return ""
+                except AttributeError:
+                    # Если PyPDF2 не имеет PdfReader, пробуем pypdf
+                    if pypdf is not None:
+                        pdf_reader = pypdf.PdfReader(file)
+                    else:
+                        raise
+                
+                num_pages = len(pdf_reader.pages)
+                logger.debug(f"Extracting text from PDF with PyPDF2/pypdf: {num_pages} pages")
+                
+                for i, page in enumerate(pdf_reader.pages):
+                    try:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+                    except Exception as page_error:
+                        logger.warning(f"Error extracting text from page {i+1}: {page_error}")
+                        continue
+                
+                if text.strip():
+                    logger.debug(f"Successfully extracted text from PDF using PyPDF2/pypdf: {len(text)} characters")
+                    return text
+                else:
+                    logger.warning(f"PyPDF2/pypdf extracted empty text from PDF: {file_path}")
+                    return ""
+        except NameError as e:
+            # Обрабатываем случай, когда PyPDF2 не определен в области видимости
+            logger.error(f"PyPDF2/pypdf is not available in this context: {e}")
+            logger.error("This might be a Celery worker import issue. Please ensure PyPDF2 or pypdf is installed.")
+            return ""
+        except Exception as e:
+            logger.error(f"Error extracting text from PDF {file_path} with PyPDF2/pypdf: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return ""
     
-    @staticmethod
-    def extract_text_from_docx(file_path: str) -> str:
-        """Извлечение текста из DOCX (с fallback на python-docx)"""
-        # Пробуем LangChain loader
-        text = DocumentProcessor._load_with_langchain(file_path)
-        if text is not None:
-            return text
+    def extract_text_from_docx(self, file_path: str) -> str:
+        """Извлечение текста из DOCX (с использованием Vision API и fallback на LangChain/python-docx)"""
+        # Для DOCX сначала пробуем Vision API, если файл можно отправить как изображение
+        # Но обычно DOCX лучше обрабатывать через python-docx, так что сначала пробуем стандартные методы
         
-        # Fallback на старую реализацию
-        if not LANGCHAIN_AVAILABLE:
+        # Пробуем LangChain loader
+        if LANGCHAIN_AVAILABLE:
             try:
-                doc = Document(file_path)
-                text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-                return text
+                text = DocumentProcessor._load_with_langchain(file_path)
+                if text and text.strip():
+                    logger.debug(f"Successfully extracted text from DOCX using LangChain: {len(text)} characters")
+                    return text
             except Exception as e:
-                logger.error(f"Error extracting text from DOCX {file_path}: {e}")
+                logger.warning(f"LangChain DOCX loader failed for {file_path}: {e}, trying fallback")
+        
+        # Fallback на python-docx
+        if Document is None:
+            logger.error("python-docx is not installed. Cannot extract text from DOCX.")
+            return ""
+        
+        try:
+            doc = Document(file_path)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            if text.strip():
+                logger.debug(f"Successfully extracted text from DOCX using python-docx: {len(text)} characters")
+                return text
+            else:
+                logger.warning(f"python-docx extracted empty text from DOCX: {file_path}")
                 return ""
-        return ""
+        except Exception as e:
+            logger.error(f"Error extracting text from DOCX {file_path}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return ""
     
-    @staticmethod
-    def extract_text_from_xlsx(file_path: str) -> str:
+    def extract_text_from_xlsx(self, file_path: str) -> str:
         """Извлечение текста из XLSX (с fallback на openpyxl)"""
         # Пробуем LangChain loader
-        text = DocumentProcessor._load_with_langchain(file_path)
-        if text is not None:
-            return text
-        
-        # Fallback на старую реализацию
-        if not LANGCHAIN_AVAILABLE:
+        if LANGCHAIN_AVAILABLE:
             try:
-                workbook = openpyxl.load_workbook(file_path)
-                text = ""
-                for sheet in workbook.worksheets:
-                    for row in sheet.iter_rows(values_only=True):
-                        text += " ".join([str(cell) if cell else "" for cell in row]) + "\n"
-                return text
+                text = DocumentProcessor._load_with_langchain(file_path)
+                if text and text.strip():
+                    logger.debug(f"Successfully extracted text from XLSX using LangChain: {len(text)} characters")
+                    return text
             except Exception as e:
-                logger.error(f"Error extracting text from XLSX {file_path}: {e}")
+                logger.warning(f"LangChain XLSX loader failed for {file_path}: {e}, trying fallback")
+        
+        # Fallback на openpyxl
+        if openpyxl is None:
+            logger.error("openpyxl is not installed. Cannot extract text from XLSX.")
+            return ""
+        
+        try:
+            workbook = openpyxl.load_workbook(file_path)
+            text = ""
+            for sheet in workbook.worksheets:
+                for row in sheet.iter_rows(values_only=True):
+                    text += " ".join([str(cell) if cell else "" for cell in row]) + "\n"
+            if text.strip():
+                logger.debug(f"Successfully extracted text from XLSX using openpyxl: {len(text)} characters")
+                return text
+            else:
+                logger.warning(f"openpyxl extracted empty text from XLSX: {file_path}")
                 return ""
-        return ""
+        except Exception as e:
+            logger.error(f"Error extracting text from XLSX {file_path}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return ""
     
-    @staticmethod
-    def extract_text_from_txt(file_path: str) -> str:
+    def extract_text_from_txt(self, file_path: str) -> str:
         """Извлечение текста из TXT"""
         # Пробуем LangChain loader
         text = DocumentProcessor._load_with_langchain(file_path)
@@ -158,19 +769,35 @@ class DocumentProcessor:
             logger.error(f"Error reading TXT file {file_path}: {e}")
             return ""
     
-    @classmethod
-    def process_document(cls, file_path: str) -> str:
+    def process_document(self, file_path: str) -> str:
         """Обработка документа любого поддерживаемого типа"""
         file_ext = Path(file_path).suffix.lower()
         
+        # Проверяем, является ли файл изображением - если да, отправляем напрямую в Vision API
+        if self.use_vision_api and file_ext.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']:
+            logger.info(f"[DocumentProcessor] Detected image file: {file_path}, will send to Vision API")
+            text = self._extract_text_via_vision_api(file_path)
+            # text может быть None (ошибка) или пустой строкой (нет текста на изображении)
+            if text is not None:
+                # Очищаем текст от технической информации
+                cleaned_text = DocumentProcessor._clean_ocr_text(text)
+                if cleaned_text != text:
+                    logger.info(f"[DocumentProcessor] Cleaned OCR text: removed {len(text) - len(cleaned_text)} characters of technical metadata")
+                # Пустая строка - валидный результат (изображение без текста)
+                logger.info(f"[DocumentProcessor] Vision API processing completed for image: {file_path}")
+                return cleaned_text
+            else:
+                logger.warning(f"[DocumentProcessor] Vision API failed to process image: {file_path}, no fallback available for images")
+                return ""
+        
         if file_ext == '.pdf':
-            return cls.extract_text_from_pdf(file_path)
+            return self.extract_text_from_pdf(file_path)
         elif file_ext == '.docx':
-            return cls.extract_text_from_docx(file_path)
+            return self.extract_text_from_docx(file_path)
         elif file_ext == '.xlsx' or file_ext == '.xls':
-            return cls.extract_text_from_xlsx(file_path)
+            return self.extract_text_from_xlsx(file_path)
         elif file_ext == '.txt':
-            return cls.extract_text_from_txt(file_path)
+            return self.extract_text_from_txt(file_path)
         else:
             logger.warning(f"Unsupported file type: {file_ext}")
             return ""

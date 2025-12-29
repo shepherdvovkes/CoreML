@@ -183,3 +183,5 @@ redis-cli
 - **DEPLOYMENT.md**: Подробная инструкция по развертыванию
 - **ARCHITECTURE_REVIEW.md**: Архитектурный анализ
 
+
+

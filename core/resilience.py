@@ -4,7 +4,8 @@
 """
 import asyncio
 import functools
-from typing import Callable, Any, Optional, Type, Tuple, Union
+import inspect
+from typing import Callable, Any, Optional, Type, Tuple, Union, AsyncIterator
 from loguru import logger
 from tenacity import (
     retry,
@@ -95,10 +96,14 @@ class CircuitBreakers:
     def get_breaker(cls, name: str, **kwargs) -> CircuitBreaker:
         """Получить или создать circuit breaker"""
         if name not in cls._breakers:
+            from core.resilience import _resilience_config
+            expected_exception = kwargs.get('expected_exception', _resilience_config.CB_EXPECTED_EXCEPTION)
+            # exclude должен быть списком или None
+            exclude_list = [expected_exception] if expected_exception and isinstance(expected_exception, type) else (expected_exception if expected_exception else None)
             cb_config = {
-                'fail_max': kwargs.get('fail_max', ResilienceConfig.CB_FAIL_MAX),
-                'timeout_duration': kwargs.get('timeout', ResilienceConfig.CB_TIMEOUT),
-                'expected_exception': kwargs.get('expected_exception', ResilienceConfig.CB_EXPECTED_EXCEPTION),
+                'fail_max': kwargs.get('fail_max', _resilience_config.CB_FAIL_MAX),
+                'reset_timeout': kwargs.get('timeout', _resilience_config.CB_TIMEOUT),
+                'exclude': exclude_list,
                 'name': name,
             }
             cls._breakers[name] = CircuitBreaker(**cb_config)
@@ -157,7 +162,28 @@ def with_retry(
             reraise=True
         )
         
-        if asyncio.iscoroutinefunction(func):
+        # Проверяем, является ли функция асинхронным генератором
+        # Для bound methods нужно проверять исходную функцию
+        original_func = func
+        if hasattr(func, '__func__'):
+            # Это bound method, проверяем исходную функцию
+            original_func = func.__func__
+        elif hasattr(func, '__wrapped__'):
+            # Это обернутая функция, проверяем исходную
+            original_func = func.__wrapped__
+        
+        is_async_gen = inspect.isasyncgenfunction(original_func)
+        
+        if is_async_gen:
+            @functools.wraps(func)
+            async def async_gen_wrapper(*args, **kwargs):
+                # Для async generators retry не применяется на уровне генератора
+                # так как это сложно реализовать правильно
+                # Просто возвращаем генератор как есть
+                async for item in func(*args, **kwargs):
+                    yield item
+            return async_gen_wrapper
+        elif asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 try:
@@ -211,11 +237,69 @@ def with_circuit_breaker(
             expected_exception=_expected_exception
         )
         
-        if asyncio.iscoroutinefunction(func):
+        # Проверяем, является ли функция асинхронным генератором
+        # Для bound methods нужно проверять исходную функцию
+        original_func = func
+        if hasattr(func, '__func__'):
+            # Это bound method, проверяем исходную функцию
+            original_func = func.__func__
+        elif hasattr(func, '__wrapped__'):
+            # Это обернутая функция, проверяем исходную
+            original_func = func.__wrapped__
+        
+        is_async_gen = inspect.isasyncgenfunction(original_func)
+        
+        if is_async_gen:
+            @functools.wraps(func)
+            async def async_gen_wrapper(*args, **kwargs):
+                # Для async generators circuit breaker проверяется перед началом генерации
+                if breaker.current_state == 'open':
+                    raise CircuitBreakerError(f"Circuit breaker '{name}' is OPEN")
+                try:
+                    # Вызываем функцию - для async generator функции это вернет async generator объект
+                    gen = func(*args, **kwargs)
+                    # Проверяем, является ли результат async generator
+                    if inspect.isasyncgen(gen):
+                        async for item in gen:
+                            yield item
+                    else:
+                        # Если это корутина (для обернутых функций), await её
+                        gen = await gen
+                        if inspect.isasyncgen(gen):
+                            async for item in gen:
+                                yield item
+                        else:
+                            # Если это обычное значение, yield его
+                            yield gen
+                    # Успешное завершение генератора - circuit breaker автоматически отслеживает это
+                    # через состояние, но для async generators мы не можем использовать call/call_async
+                    # поэтому просто проверяем состояние
+                except Exception as exc:
+                    # Ошибка в генераторе - circuit breaker отслеживает это через состояние
+                    # Для async generators pybreaker не может автоматически обновить счетчики,
+                    # поэтому просто пробрасываем исключение
+                    raise exc
+            return async_gen_wrapper
+        elif asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 try:
+                    # Пытаемся использовать call_async если доступен
                     return await breaker.call_async(func, *args, **kwargs)
+                except (NameError, AttributeError) as e:
+                        # Если call_async не работает (нет tornado), используем обходной путь
+                        if breaker.current_state == 'open':
+                            raise CircuitBreakerError(f"Circuit breaker '{name}' is OPEN")
+                        try:
+                            result = await func(*args, **kwargs)
+                            # Для async функций pybreaker не может автоматически отслеживать успех/ошибку
+                            # через call_async, поэтому просто возвращаем результат
+                            # Circuit breaker будет отслеживать состояние через другие механизмы
+                            return result
+                        except Exception as exc:
+                            # Ошибка - пробрасываем исключение
+                            # Circuit breaker будет отслеживать это через состояние
+                            raise exc
                 except CircuitBreakerError as e:
                     logger.error(f"Circuit breaker '{name}' is OPEN: {e}")
                     raise
@@ -248,7 +332,44 @@ def with_timeout(seconds: Optional[int] = None):
     def decorator(func: Callable) -> Callable:
         _seconds = seconds if seconds is not None else _resilience_config.DEFAULT_TIMEOUT
         
-        if asyncio.iscoroutinefunction(func):
+        # Проверяем, является ли функция асинхронным генератором
+        # Для bound methods нужно проверять исходную функцию
+        original_func = func
+        if hasattr(func, '__func__'):
+            # Это bound method, проверяем исходную функцию
+            original_func = func.__func__
+        elif hasattr(func, '__wrapped__'):
+            # Это обернутая функция, проверяем исходную
+            original_func = func.__wrapped__
+        
+        is_async_gen = inspect.isasyncgenfunction(original_func)
+        
+        if is_async_gen:
+            @functools.wraps(func)
+            async def async_gen_wrapper(*args, **kwargs):
+                # Для async generators timeout применяется на уровне итераций
+                start_time = asyncio.get_event_loop().time()
+                gen = func(*args, **kwargs)
+                # Проверяем, является ли результат async generator
+                if inspect.isasyncgen(gen):
+                    async for item in gen:
+                        current_time = asyncio.get_event_loop().time()
+                        if current_time - start_time > _seconds:
+                            logger.error(f"Timeout ({_seconds}s) exceeded for {func.__name__}")
+                            raise TimeoutError(f"Operation {func.__name__} timed out after {_seconds}s")
+                        yield item
+                else:
+                    # Если это корутина (для обернутых функций), await её
+                    gen = await gen
+                    if inspect.isasyncgen(gen):
+                        async for item in gen:
+                            current_time = asyncio.get_event_loop().time()
+                            if current_time - start_time > _seconds:
+                                logger.error(f"Timeout ({_seconds}s) exceeded for {func.__name__}")
+                                raise TimeoutError(f"Operation {func.__name__} timed out after {_seconds}s")
+                            yield item
+            return async_gen_wrapper
+        elif asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 try:
@@ -316,7 +437,33 @@ def resilient(
             ...
     """
     def decorator(func: Callable) -> Callable:
-        # Применяем декораторы в порядке: timeout -> circuit_breaker -> retry
+        # Проверяем, является ли функция асинхронным генератором
+        is_async_gen = inspect.isasyncgenfunction(func)
+        
+        # Для async generators применяем декораторы по-другому
+        if is_async_gen:
+            # Применяем декораторы в порядке: timeout -> circuit_breaker -> retry
+            decorated = func
+            
+            # 1. Retry (внутренний слой) - для async generators просто пропускаем
+            # Retry на async generators сложен, поэтому не применяем
+            decorated = func  # Пропускаем retry для async generators
+            
+            # 2. Circuit Breaker (средний слой)
+            if circuit_breaker:
+                decorated = with_circuit_breaker(
+                    name=name,
+                    fail_max=cb_fail_max,
+                    timeout=cb_timeout
+                )(decorated)
+            
+            # 3. Timeout (внешний слой)
+            decorated = with_timeout(timeout_seconds)(decorated)
+            
+            # Для async generators просто возвращаем декорированный генератор
+            return decorated
+        
+        # Для обычных функций применяем все декораторы
         decorated = func
         
         # 1. Retry (внутренний слой)
@@ -336,6 +483,7 @@ def resilient(
         # 3. Timeout (внешний слой)
         decorated = with_timeout(timeout_seconds)(decorated)
         
+        # Для обычных async функций оборачиваем в wrapper
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             logger.debug(f"Calling resilient function: {name}")

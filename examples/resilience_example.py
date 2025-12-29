@@ -229,3 +229,5 @@ if __name__ == "__main__":
     # Запуск примеров
     asyncio.run(main())
 
+
+
