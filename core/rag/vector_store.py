@@ -536,23 +536,51 @@ class QdrantVectorStore(VectorStoreBase):
                 
                 import os
                 basename = os.path.basename(filename)
+                basename_lower = basename.lower()
+                filename_lower = filename.lower()
                 logger.debug(f"Searching for filename: '{filename}', basename: '{basename}'")
                 
                 for point in all_points:
                     payload = point.payload or {}
-                    payload_filename = payload.get('filename')
-                    payload_file_path = payload.get('file_path')
-                    payload_source = payload.get('source')
+                    payload_filename = payload.get('filename', '')
+                    payload_file_path = payload.get('file_path', '')
+                    payload_source = payload.get('source', '')
+                    
+                    # Нормализуем имена для сравнения (приводим к нижнему регистру)
+                    payload_filename_lower = payload_filename.lower() if payload_filename else ''
+                    payload_file_path_lower = payload_file_path.lower() if payload_file_path else ''
+                    payload_source_lower = payload_source.lower() if payload_source else ''
+                    
+                    # Получаем базовые имена для сравнения
+                    payload_basename = os.path.basename(payload_filename) if payload_filename else ''
+                    payload_basename_lower = payload_basename.lower() if payload_basename else ''
+                    payload_source_basename = os.path.basename(payload_source) if payload_source else ''
+                    payload_source_basename_lower = payload_source_basename.lower() if payload_source_basename else ''
                     
                     # Логируем первые несколько payload для отладки
                     if len(points) < 3:
                         logger.debug(f"Sample payload - filename: '{payload_filename}', file_path: '{payload_file_path}', source: '{payload_source}'")
                     
-                    if (payload_filename == filename or
+                    # Проверяем различные варианты совпадения (с учетом регистра расширения)
+                    matches = (
+                        # Точное совпадение
+                        payload_filename == filename or
+                        payload_filename == basename or
                         payload_file_path == filename or
                         payload_source == filename or
-                        (payload_source and os.path.basename(payload_source) == basename) or
-                        (payload_filename and os.path.basename(payload_filename) == basename)):
+                        # Совпадение базовых имен
+                        payload_basename == basename or
+                        payload_source_basename == basename or
+                        # Совпадение без учета регистра расширения
+                        payload_filename_lower == filename_lower or
+                        payload_filename_lower == basename_lower or
+                        payload_file_path_lower == filename_lower or
+                        payload_source_lower == filename_lower or
+                        payload_basename_lower == basename_lower or
+                        payload_source_basename_lower == basename_lower
+                    )
+                    
+                    if matches:
                         points.append(point)
                 
                 logger.debug(f"Found {len(points)} chunks matching filename '{filename}'")
@@ -770,6 +798,15 @@ class ChromaVectorStore(VectorStoreBase):
     def get_document_chunks(self, filename: str) -> List[Dict[str, Any]]:
         """Получение всех чанков документа по имени файла из ChromaDB"""
         try:
+            import os
+            
+            # Нормализуем имя файла для поиска
+            # Получаем базовое имя файла (без пути)
+            basename = os.path.basename(filename)
+            # Нормализуем расширение (приводим к нижнему регистру для сравнения)
+            basename_lower = basename.lower()
+            filename_lower = filename.lower()
+            
             # Получаем все документы с фильтром по filename
             results = self.collection.get(
                 where={"filename": filename},
@@ -785,24 +822,67 @@ class ChromaVectorStore(VectorStoreBase):
             
             # Если не нашли, пробуем по source (базовое имя файла)
             if not results['documents']:
-                import os
-                basename = os.path.basename(filename)
-                all_results = self.collection.get(
+                results = self.collection.get(
+                    where={"source": filename},
                     include=['metadatas', 'documents']
                 )
-                # Фильтруем вручную
+            
+            # Если все еще не нашли, ищем по всем документам с нечетким сравнением
+            # (учитываем регистр расширения и разные варианты пути)
+            if not results['documents']:
+                all_results = self.collection.get(
+                    include=['metadatas', 'documents', 'ids']
+                )
+                # Фильтруем вручную с учетом регистра расширения
                 filtered_docs = []
                 filtered_metas = []
+                filtered_ids = []
+                
                 for i, meta in enumerate(all_results.get('metadatas', [])):
-                    if (meta.get('filename') == basename or 
-                        meta.get('file_path') == filename or
-                        meta.get('source') == filename or
-                        (meta.get('source') and os.path.basename(meta.get('source')) == basename)):
+                    meta_filename = meta.get('filename', '')
+                    meta_file_path = meta.get('file_path', '')
+                    meta_source = meta.get('source', '')
+                    
+                    # Нормализуем имена для сравнения (приводим к нижнему регистру)
+                    meta_filename_lower = meta_filename.lower() if meta_filename else ''
+                    meta_file_path_lower = meta_file_path.lower() if meta_file_path else ''
+                    meta_source_lower = meta_source.lower() if meta_source else ''
+                    
+                    # Получаем базовые имена для сравнения
+                    meta_basename = os.path.basename(meta_filename) if meta_filename else ''
+                    meta_basename_lower = meta_basename.lower() if meta_basename else ''
+                    meta_source_basename = os.path.basename(meta_source) if meta_source else ''
+                    meta_source_basename_lower = meta_source_basename.lower() if meta_source_basename else ''
+                    
+                    # Проверяем различные варианты совпадения
+                    matches = (
+                        # Точное совпадение
+                        meta_filename == filename or
+                        meta_filename == basename or
+                        meta_file_path == filename or
+                        meta_source == filename or
+                        # Совпадение базовых имен
+                        meta_basename == basename or
+                        meta_source_basename == basename or
+                        # Совпадение без учета регистра расширения
+                        meta_filename_lower == filename_lower or
+                        meta_filename_lower == basename_lower or
+                        meta_file_path_lower == filename_lower or
+                        meta_source_lower == filename_lower or
+                        meta_basename_lower == basename_lower or
+                        meta_source_basename_lower == basename_lower
+                    )
+                    
+                    if matches:
                         filtered_docs.append(all_results['documents'][i])
                         filtered_metas.append(meta)
+                        if 'ids' in all_results and i < len(all_results['ids']):
+                            filtered_ids.append(all_results['ids'][i])
+                
                 results = {
                     'documents': filtered_docs,
-                    'metadatas': filtered_metas
+                    'metadatas': filtered_metas,
+                    'ids': filtered_ids
                 }
             
             # Форматируем результаты

@@ -381,7 +381,11 @@ class DocumentProcessor:
             elif file_ext == '.txt':
                 loader = TextLoader(file_path, encoding='utf-8')
             elif file_ext in ['.html', '.htm'] and HTML_LOADER_AVAILABLE and BSHTMLLoader is not None:
-                loader = BSHTMLLoader(file_path)
+                try:
+                    loader = BSHTMLLoader(file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to create BSHTMLLoader for {file_path}: {e}")
+                    return None
             else:
                 return None
             
@@ -804,37 +808,51 @@ class DocumentProcessor:
         try:
             with open(file_path, 'rb') as f:
                 raw_content = f.read(8192)  # Читаем первые 8KB
-                content_str = raw_content.decode('utf-8', errors='ignore')
                 
-                # Ищем charset в meta тегах
-                import re
-                charset_match = re.search(r'charset\s*=\s*["\']?([^"\'\s>]+)', content_str, re.IGNORECASE)
-                if charset_match:
-                    detected_encoding = charset_match.group(1).lower()
-                    # Нормализуем названия кодировок
-                    if detected_encoding in ['windows-1251', 'cp1251']:
-                        return 'windows-1251'
-                    elif detected_encoding in ['utf-8', 'utf8']:
-                        return 'utf-8'
-                    elif detected_encoding in ['iso-8859-1', 'latin-1']:
-                        return 'iso-8859-1'
-        except Exception:
-            pass
+                # Пробуем разные кодировки для чтения meta тегов
+                for test_enc in ['utf-8', 'windows-1251', 'cp1251', 'iso-8859-1']:
+                    try:
+                        content_str = raw_content.decode(test_enc, errors='ignore')
+                        
+                        # Ищем charset в meta тегах
+                        import re
+                        charset_match = re.search(r'charset\s*=\s*["\']?([^"\'\s>]+)', content_str, re.IGNORECASE)
+                        if charset_match:
+                            detected_encoding = charset_match.group(1).lower()
+                            # Нормализуем названия кодировок
+                            if detected_encoding in ['windows-1251', 'cp1251']:
+                                logger.debug(f"Detected encoding from meta tag: windows-1251")
+                                return 'windows-1251'
+                            elif detected_encoding in ['utf-8', 'utf8']:
+                                logger.debug(f"Detected encoding from meta tag: utf-8")
+                                return 'utf-8'
+                            elif detected_encoding in ['iso-8859-1', 'latin-1']:
+                                logger.debug(f"Detected encoding from meta tag: iso-8859-1")
+                                return 'iso-8859-1'
+                        break  # Если удалось декодировать, прекращаем попытки
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+        except Exception as e:
+            logger.debug(f"Error detecting encoding from meta tags: {e}")
         
         # Если не нашли в meta, пробуем определить по содержимому
         for encoding in encodings:
             try:
-                with open(file_path, 'r', encoding=encoding) as f:
+                with open(file_path, 'r', encoding=encoding, errors='strict') as f:
                     f.read(1024)  # Пробуем прочитать первые 1KB
+                logger.debug(f"Detected encoding by testing: {encoding}")
                 return encoding
             except (UnicodeDecodeError, UnicodeError):
                 continue
         
         # По умолчанию возвращаем utf-8
+        logger.debug(f"Using default encoding: utf-8")
         return 'utf-8'
     
     def extract_text_from_html(self, file_path: str) -> str:
         """Извлечение текста из HTML (с использованием LangChain и fallback на BeautifulSoup/html.parser)"""
+        logger.info(f"[DocumentProcessor] Processing HTML file: {file_path}")
+        
         # Определяем кодировку файла
         encoding = self._detect_html_encoding(file_path)
         logger.debug(f"Detected HTML encoding: {encoding} for {file_path}")
@@ -844,83 +862,91 @@ class DocumentProcessor:
             try:
                 text = DocumentProcessor._load_with_langchain(file_path)
                 if text and text.strip():
-                    logger.debug(f"Successfully extracted text from HTML using LangChain: {len(text)} characters")
+                    logger.info(f"Successfully extracted text from HTML using LangChain: {len(text)} characters")
                     return text
             except Exception as e:
                 logger.warning(f"LangChain HTML loader failed for {file_path}: {e}, trying fallback")
         
-        # Fallback на BeautifulSoup
+        # Fallback на BeautifulSoup с попыткой разных кодировок
         if BEAUTIFULSOUP_AVAILABLE:
+            encodings_to_try = [encoding, 'utf-8', 'windows-1251', 'cp1251', 'iso-8859-1', 'latin-1']
+            for enc in encodings_to_try:
+                try:
+                    with open(file_path, 'r', encoding=enc, errors='replace') as file:
+                        html_content = file.read()
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                        
+                        # Удаляем скрипты и стили
+                        for script in soup(["script", "style"]):
+                            script.decompose()
+                        
+                        # Извлекаем текст
+                        text = soup.get_text()
+                        
+                        # Очищаем текст от лишних пробелов и переносов строк
+                        lines = (line.strip() for line in text.splitlines())
+                        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                        text = '\n'.join(chunk for chunk in chunks if chunk)
+                        
+                        if text.strip():
+                            logger.info(f"Successfully extracted text from HTML using BeautifulSoup (encoding: {enc}): {len(text)} characters")
+                            return text
+                except UnicodeDecodeError:
+                    logger.debug(f"Failed to decode HTML with encoding {enc}, trying next")
+                    continue
+                except Exception as e:
+                    logger.warning(f"BeautifulSoup failed for {file_path} with encoding {enc}: {e}, trying next")
+                    continue
+            
+            logger.warning(f"BeautifulSoup failed for {file_path} with all encodings, trying html.parser fallback")
+        
+        # Fallback на стандартную библиотеку html.parser с попыткой разных кодировок
+        encodings_to_try = [encoding, 'utf-8', 'windows-1251', 'cp1251', 'iso-8859-1', 'latin-1']
+        for enc in encodings_to_try:
             try:
-                with open(file_path, 'r', encoding=encoding) as file:
+                class HTMLTextExtractor(html.parser.HTMLParser):
+                    def __init__(self):
+                        super().__init__()
+                        self.text = []
+                        self.skip_tags = {'script', 'style', 'meta', 'link', 'head'}
+                        self.in_skip_tag = False
+                    
+                    def handle_starttag(self, tag, attrs):
+                        if tag in self.skip_tags:
+                            self.in_skip_tag = True
+                    
+                    def handle_endtag(self, tag):
+                        if tag in self.skip_tags:
+                            self.in_skip_tag = False
+                        elif tag in {'p', 'div', 'br', 'li'}:
+                            self.text.append('\n')
+                    
+                    def handle_data(self, data):
+                        if not self.in_skip_tag:
+                            self.text.append(data.strip())
+                
+                with open(file_path, 'r', encoding=enc, errors='replace') as file:
                     html_content = file.read()
-                    soup = BeautifulSoup(html_content, 'html.parser')
+                    extractor = HTMLTextExtractor()
+                    extractor.feed(html_content)
                     
-                    # Удаляем скрипты и стили
-                    for script in soup(["script", "style"]):
-                        script.decompose()
-                    
-                    # Извлекаем текст
-                    text = soup.get_text()
-                    
-                    # Очищаем текст от лишних пробелов и переносов строк
-                    lines = (line.strip() for line in text.splitlines())
-                    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                    text = '\n'.join(chunk for chunk in chunks if chunk)
+                    # Объединяем текст и очищаем от лишних пробелов
+                    text = ' '.join(extractor.text)
+                    text = re.sub(r'\s+', ' ', text)  # Заменяем множественные пробелы на один
+                    text = re.sub(r'\n\s*\n', '\n', text)  # Удаляем пустые строки
                     
                     if text.strip():
-                        logger.debug(f"Successfully extracted text from HTML using BeautifulSoup: {len(text)} characters")
-                        return text
-                    else:
-                        logger.warning(f"BeautifulSoup extracted empty text from HTML: {file_path}")
-                        return ""
+                        logger.info(f"Successfully extracted text from HTML using html.parser (encoding: {enc}): {len(text)} characters")
+                        return text.strip()
+            except UnicodeDecodeError:
+                logger.debug(f"Failed to decode HTML with encoding {enc}, trying next")
+                continue
             except Exception as e:
-                logger.warning(f"BeautifulSoup failed for {file_path}: {e}, trying html.parser fallback")
+                logger.warning(f"html.parser failed for {file_path} with encoding {enc}: {e}, trying next")
+                continue
         
-        # Fallback на стандартную библиотеку html.parser
-        try:
-            class HTMLTextExtractor(html.parser.HTMLParser):
-                def __init__(self):
-                    super().__init__()
-                    self.text = []
-                    self.skip_tags = {'script', 'style', 'meta', 'link', 'head'}
-                    self.in_skip_tag = False
-                
-                def handle_starttag(self, tag, attrs):
-                    if tag in self.skip_tags:
-                        self.in_skip_tag = True
-                
-                def handle_endtag(self, tag):
-                    if tag in self.skip_tags:
-                        self.in_skip_tag = False
-                    elif tag in {'p', 'div', 'br', 'li'}:
-                        self.text.append('\n')
-                
-                def handle_data(self, data):
-                    if not self.in_skip_tag:
-                        self.text.append(data.strip())
-            
-            with open(file_path, 'r', encoding=encoding) as file:
-                html_content = file.read()
-                extractor = HTMLTextExtractor()
-                extractor.feed(html_content)
-                
-                # Объединяем текст и очищаем от лишних пробелов
-                text = ' '.join(extractor.text)
-                text = re.sub(r'\s+', ' ', text)  # Заменяем множественные пробелы на один
-                text = re.sub(r'\n\s*\n', '\n', text)  # Удаляем пустые строки
-                
-                if text.strip():
-                    logger.debug(f"Successfully extracted text from HTML using html.parser: {len(text)} characters")
-                    return text.strip()
-                else:
-                    logger.warning(f"html.parser extracted empty text from HTML: {file_path}")
-                    return ""
-        except Exception as e:
-            logger.error(f"Error extracting text from HTML {file_path}: {e}")
-            import traceback
-            logger.debug(traceback.format_exc())
-            return ""
+        logger.error(f"Failed to extract text from HTML {file_path} with all methods and encodings")
+        return ""
     
     def process_document(self, file_path: str) -> str:
         """Обработка документа любого поддерживаемого типа"""

@@ -351,7 +351,15 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             "видишь документы", "бачиш документи", "мои файлы", "мої файли",
             "какие данные", "які дані", "что загрузил", "що завантажив",
             "что я загрузил", "що я завантажив", "какие файлы загрузил",
-            "які файли завантажив", "видишь что загрузил", "бачиш що завантажив"
+            "які файли завантажив", "видишь что загрузил", "бачиш що завантажив",
+            "в документах", "из документов", "з документів",
+            "в моих документах", "в моїх документах", "в загруженных документах",
+            "в завантажених документах", "номер дела в документах", "номер справи в документах",
+            "номер дела из документов", "номер справи з документів", "в моих файлах", "в моїх файлах",
+            "какой номер", "який номер", "найди номер", "знайди номер",
+            "найти номер", "знайти номер", "есть номер", "є номер",
+            "против.*в документах", "проти.*в документах", "против.*из документов",
+            "проти.*з документів", "против.*в моих", "проти.*в моїх"
         ]
         
         # Фразы, которые указывают на запрос о списке документов (нужно вернуть все документы)
@@ -386,8 +394,21 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
         use_law = any(keyword in query_lower for keyword in law_keywords)
         use_rag = any(keyword in query_lower for keyword in document_keywords)
         
-        # Проверяем специальные фразы про документы пользователя
-        is_user_document_query = any(phrase in query_lower for phrase in user_document_phrases)
+        # Проверяем специальные фразы про документы пользователя (с поддержкой regex)
+        is_user_document_query = False
+        for phrase in user_document_phrases:
+            if '.*' in phrase:
+                # Регулярное выражение
+                pattern = phrase.replace('.*', '.*')
+                if re.search(pattern, query_lower):
+                    is_user_document_query = True
+                    logger.debug(f"User document query matched by regex pattern: {phrase}")
+                    break
+            elif phrase in query_lower:
+                is_user_document_query = True
+                logger.debug(f"User document query matched by phrase: {phrase}")
+                break
+        
         is_list_documents_query = any(phrase in query_lower for phrase in list_document_phrases)
         is_delete_query = any(phrase in query_lower for phrase in delete_document_phrases)
         is_document_text_query = any(phrase in query_lower for phrase in document_text_phrases)
@@ -416,15 +437,17 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                 except ValueError:
                     pass
         
+        # Если запрос явно про документы пользователя (например, "номер дела в документах"),
+        # приоритет RAG, даже если есть упоминания о судебных делах
+        if is_user_document_query:
+            use_rag = True
+            use_law = False  # Если явно про документы пользователя, не используем MCP Law
+            logger.info(f"User document query detected: '{query}' - using RAG only")
         # Если в запросе есть номер дела в формате число/число/число, это точно запрос о судебном деле
-        if has_case_number:
+        elif has_case_number:
             use_law = True
             use_rag = False  # Номер дела - это точно не документ пользователя
             logger.info(f"Detected case number in query: {case_number_match.group(0)}")
-        # Если запрос явно про документы пользователя, используем только RAG
-        elif is_user_document_query:
-            use_rag = True
-            use_law = False
         # Если есть ключевые слова о судебных делах, используем MCP Law
         elif is_case_query:
             use_law = True
@@ -485,13 +508,72 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
         Returns:
             Ответ с результатами обработки
         """
-        # Проверка наличия документов в RAG
-        has_docs = await self.rag_service.has_documents()
-        
-        # Проверяем, есть ли в запросе номер дела (формат: число/число/число)
+        # Проверяем, является ли это запросом на полный текст дела
+        # Если да, возвращаем текст напрямую из MCP, минуя LLM
         import re
         case_number_pattern = r'\d+/\d+/\d+'
-        has_case_number = re.search(case_number_pattern, query) is not None
+        case_number_match = re.search(case_number_pattern, query)
+        has_case_number = case_number_match is not None
+        
+        # Проверяем, запрашивается ли полный текст дела
+        full_text_keywords = [
+            "полный текст", "повний текст", "полный текст дела", "повний текст справи",
+            "весь текст", "весь текст дела", "весь текст справи",
+            "текст дела", "текст справи", "покажи текст дела", "покажи текст справи",
+            "дай полный текст", "дай мне полный текст", "дай текст дела", "дай мне текст дела",
+            "покажи полный текст", "покажи мне полный текст", "покажи весь текст"
+        ]
+        is_full_text_request = any(keyword in query.lower() for keyword in full_text_keywords)
+        
+        # Если это запрос на полный текст дела с номером, возвращаем напрямую из MCP
+        if has_case_number and is_full_text_request:
+            case_number = case_number_match.group(0)
+            logger.info(f"Direct full text request detected for case {case_number}, bypassing LLM")
+            
+            try:
+                # Получаем детали дела по номеру
+                details = await self.law_client.get_case_details(case_number=case_number)
+                if details and details.get('success'):
+                    cases_list = details.get('cases', [])
+                    if cases_list:
+                        case = cases_list[0]
+                        doc_id = case.get('doc_id') or case.get('id')
+                        
+                        if doc_id:
+                            # Получаем полный текст
+                            full_text_data = await self.law_client.get_case_full_text(str(doc_id))
+                            if full_text_data and full_text_data.get('success'):
+                                text = full_text_data.get('text', '')
+                                if text:
+                                    # Форматируем ответ для клиента
+                                    title = case.get('title', 'N/A')
+                                    answer = f"Вот полный текст дела № {case_number}:\n\n"
+                                    answer += f"Заголовок: {title}\n\n"
+                                    answer += f"Текст решения:\n{text}\n"
+                                    
+                                    return {
+                                        "answer": answer,
+                                        "sources": ["MCP_Law"],
+                                        "model": None,  # Не использовали LLM
+                                        "metadata": {
+                                            "used_rag": False,
+                                            "used_law": True,
+                                            "bypassed_llm": True,
+                                            "case_number": case_number,
+                                            "doc_id": str(doc_id)
+                                        }
+                                    }
+            
+            except Exception as e:
+                logger.error(f"Error getting full text directly from MCP: {e}")
+                return {
+                    "answer": f"Ошибка при получении полного текста дела: {str(e)}",
+                    "sources": [],
+                    "error": str(e)
+                }
+        
+        # Проверка наличия документов в RAG
+        has_docs = await self.rag_service.has_documents()
         
         # По умолчанию используем оба источника для лучшего контекста
         if use_law is None:
@@ -504,8 +586,9 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             use_law = True
             logger.info(f"Case number detected, ensuring MCP Law is enabled: {query}")
         
-        # Классификация запроса через LLM (для определения типа запроса, но не для переключения источников)
+        # Классификация запроса через LLM
         classification = await self._classify_query_llm(query)
+        logger.info(f"LLM classification: query_type={classification.get('query_type')}, use_rag={classification.get('use_rag')}, use_law={classification.get('use_law')}")
         
         # Если это запрос на удаление, обрабатываем его сразу
         if classification.get("is_delete_query"):
@@ -682,8 +765,37 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             
             if target_document:
                 filename = target_document.get('filename') or target_document.get('file_path')
-                # Получаем все чанки документа
+                file_path = target_document.get('file_path') or filename
+                
+                logger.info(f"Looking for document chunks: filename='{filename}', file_path='{file_path}'")
+                
+                # Пробуем получить чанки по разным вариантам имени файла
                 chunks = await self.rag_service.get_document_chunks(filename)
+                
+                # Если не нашли, пробуем по file_path
+                if not chunks and file_path and file_path != filename:
+                    logger.debug(f"Chunks not found by filename, trying file_path: '{file_path}'")
+                    chunks = await self.rag_service.get_document_chunks(file_path)
+                
+                # Если все еще не нашли, пробуем по базовому имени файла
+                if not chunks:
+                    import os
+                    basename = os.path.basename(filename)
+                    if basename != filename:
+                        logger.debug(f"Chunks not found, trying basename: '{basename}'")
+                        chunks = await self.rag_service.get_document_chunks(basename)
+                
+                # Если все еще не нашли, пробуем с нормализованным расширением
+                if not chunks:
+                    import os
+                    basename = os.path.basename(filename)
+                    # Пробуем с нижним регистром расширения
+                    if basename.upper().endswith('.PDF'):
+                        basename_lower = basename[:-4] + '.pdf'
+                        logger.debug(f"Chunks not found, trying lowercase extension: '{basename_lower}'")
+                        chunks = await self.rag_service.get_document_chunks(basename_lower)
+                
+                logger.info(f"Found {len(chunks)} chunks for document '{filename}'")
                 
                 if chunks:
                     # Объединяем все чанки в полный текст
@@ -702,6 +814,7 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                             }
                         }
                     else:
+                        logger.warning(f"Document '{filename}' found but text is empty")
                         return {
                             "answer": f"Документ '{filename}' найден, но текст не извлечен или пуст.",
                             "sources": ["RAG"],
@@ -712,13 +825,47 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                             }
                         }
                 else:
+                    logger.warning(f"Document '{filename}' found in list but chunks not found. Trying to find by searching all documents...")
+                    # Пробуем найти документ в списке всех документов по имени
+                    all_docs = await self.rag_service.list_documents()
+                    matching_docs = []
+                    import os
+                    target_basename = os.path.basename(filename).lower()
+                    for doc in all_docs:
+                        doc_filename = (doc.get('filename') or doc.get('file_path', '')).lower()
+                        doc_basename = os.path.basename(doc_filename).lower()
+                        if target_basename == doc_basename:
+                            matching_docs.append(doc)
+                    
+                    if matching_docs:
+                        # Пробуем получить чанки для найденного документа
+                        for doc in matching_docs:
+                            alt_filename = doc.get('filename') or doc.get('file_path')
+                            logger.debug(f"Trying alternative filename: '{alt_filename}'")
+                            chunks = await self.rag_service.get_document_chunks(alt_filename)
+                            if chunks:
+                                full_text = "\n\n".join([chunk.get('text', '') for chunk in chunks if chunk.get('text')])
+                                if full_text:
+                                    return {
+                                        "answer": f"=== Полный текст документа: {alt_filename} ===\n\n{full_text}",
+                                        "sources": ["RAG"],
+                                        "metadata": {
+                                            "used_rag": True,
+                                            "used_law": False,
+                                            "document_filename": alt_filename,
+                                            "chunks_count": len(chunks),
+                                            "text_length": len(full_text)
+                                        }
+                                    }
+                    
                     return {
-                        "answer": f"Документ '{filename}' найден, но чанки не найдены. Возможно, документ еще обрабатывается.",
+                        "answer": f"Документ '{filename}' найден в списке, но чанки не найдены. Возможно, документ еще обрабатывается или возникла проблема с индексацией. Попробуйте перезагрузить документ.",
                         "sources": ["RAG"],
                         "metadata": {
                             "used_rag": True,
                             "used_law": False,
-                            "document_filename": filename
+                            "document_filename": filename,
+                            "document_file_path": file_path
                         }
                     }
             else:
@@ -734,9 +881,149 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                     }
                 }
         
-        # Используем оба источника для запросов о документах пользователя
+        # Специальная обработка для запросов о документах пользователя - обрабатываем каждый документ отдельно через LLM
         if classification and use_rag and has_docs and classification.get("query_type") == "user_documents":
-            logger.info("User document query detected, using both RAG and MCP Law for context")
+            logger.info(f"User documents query detected, processing each document separately through LLM: '{query[:100]}...'")
+            
+            documents = await self.rag_service.list_documents()
+            if not documents:
+                return {
+                    "answer": "Нет загруженных документов для поиска.",
+                    "sources": ["RAG"],
+                    "metadata": {
+                        "used_rag": True,
+                        "used_law": False,
+                        "documents_processed": 0
+                    }
+                }
+            
+            logger.info(f"Found {len(documents)} documents, processing each one separately through LLM")
+            
+            # Получаем LLM провайдер
+            llm = LLMProviderFactory.get_provider(llm_provider, model)
+            
+            # Системный промпт для поиска в документе
+            doc_search_prompt = """Ты - помощник для поиска информации в документах.
+Пользователь задал вопрос. В контексте предоставлен полный текст одного документа.
+Твоя задача - найти ответ на вопрос пользователя в этом документе.
+
+Если ты нашел ответ - укажи его четко и конкретно.
+Если ответа нет в этом документе - ответь "Не найдено в этом документе".
+
+Отвечай кратко и по делу."""
+            
+            all_results = []
+            found_answer = None
+            
+            # Обрабатываем каждый документ отдельно
+            for i, doc in enumerate(documents, 1):
+                filename = doc.get('filename') or doc.get('file_path', 'Unknown')
+                logger.info(f"Processing document {i}/{len(documents)}: {filename}")
+                
+                # Получаем все чанки документа (полный текст)
+                chunks = await self.rag_service.get_document_chunks(filename)
+                if not chunks:
+                    logger.warning(f"No chunks found for document {i}: {filename}")
+                    continue
+                
+                # Объединяем все чанки в полный текст
+                full_text = "\n\n".join([chunk.get('text', '') for chunk in chunks if chunk.get('text')])
+                
+                if not full_text or not full_text.strip():
+                    logger.warning(f"Empty text for document {i}: {filename}")
+                    continue
+                
+                # Ограничиваем длину документа для одного запроса (чтобы не превысить лимиты)
+                max_doc_length = 80000  # ~80K символов для одного документа
+                if len(full_text) > max_doc_length:
+                    logger.warning(f"Document '{filename}' too long ({len(full_text)} chars), truncating to {max_doc_length}")
+                    full_text = full_text[:max_doc_length] + "\n\n[Текст документа обрезан из-за ограничений длины]"
+                
+                # Формируем промпт для LLM
+                doc_context = f"=== Полный текст документа {i}: {filename} ===\n\n{full_text}"
+                user_message = f"{query}\n\n{doc_context}"
+                
+                messages = [
+                    LLMMessage(role="system", content=doc_search_prompt),
+                    LLMMessage(role="user", content=user_message)
+                ]
+                
+                try:
+                    # Отправляем запрос в LLM для этого документа
+                    logger.info(f"Sending query to LLM for document {i}/{len(documents)}: {filename}")
+                    response = await llm.generate(messages, temperature=0.3, max_tokens=2000)
+                    answer = response.content.strip()
+                    
+                    logger.info(f"LLM response for document {i} '{filename}': {answer[:200]}...")
+                    
+                    # Проверяем, содержит ли ответ полезную информацию (не "не найдено")
+                    if answer and answer.lower() not in ["не найдено в этом документе", "не найдено", "not found", "немає в цьому документі"]:
+                        if not found_answer:
+                            found_answer = {
+                                "document": filename,
+                                "document_number": i,
+                                "answer": answer,
+                                "total_documents": len(documents)
+                            }
+                            logger.info(f"✅ Answer found in document {i}: {filename}")
+                        all_results.append({
+                            "document": filename,
+                            "document_number": i,
+                            "answer": answer,
+                            "model": response.model,
+                            "usage": response.usage
+                        })
+                    else:
+                        logger.debug(f"No answer found in document {i}: {filename}")
+                        all_results.append({
+                            "document": filename,
+                            "document_number": i,
+                            "answer": "Не найдено в этом документе"
+                        })
+                
+                except Exception as e:
+                    logger.error(f"Error processing document {i} '{filename}' through LLM: {e}")
+                    all_results.append({
+                        "document": filename,
+                        "document_number": i,
+                        "answer": f"Ошибка при обработке: {str(e)}"
+                    })
+            
+            # Формируем финальный ответ
+            result_model = None
+            result_usage = None
+            
+            if found_answer:
+                # Если нашли ответ, возвращаем его, но также упоминаем, что проверили все документы
+                result_text = f"Найдено в документе {found_answer['document_number']} ({found_answer['document']}):\n\n{found_answer['answer']}"
+                if len(all_results) > 1:
+                    result_text += f"\n\n(Проверено документов: {len(documents)})"
+                # Получаем model и usage из последнего успешного ответа
+                for result in all_results:
+                    if result.get('model'):
+                        result_model = result.get('model')
+                        result_usage = result.get('usage')
+                        break
+            else:
+                # Если не нашли, сообщаем что проверили все документы
+                result_text = f"Проверены все {len(documents)} документов, но информация не найдена.\n\n"
+                result_text += "Проверенные документы:\n"
+                for result in all_results:
+                    result_text += f"- {result['document']}\n"
+            
+            return {
+                "answer": result_text,
+                "sources": ["RAG"],
+                "model": result_model,
+                "usage": result_usage,
+                "metadata": {
+                    "used_rag": True,
+                    "used_law": False,
+                    "documents_processed": len(documents),
+                    "answer_found": found_answer is not None,
+                    "all_results": all_results
+                }
+            }
         
         # Если документов нет, гарантируем использование MCP Law
         if not use_rag and use_law is None:
@@ -815,6 +1102,11 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                         if context_parts:
                             return f"=== Список всех загруженных документов ===\n\n" + "\n\n".join(context_parts)
                     return None
+                # Для user_documents запросов обработка происходит в process_query до вызова get_rag_context
+                # Здесь возвращаем None, так как обработка уже выполнена
+                if classification and (classification.get("query_type") == "user_documents" or classification.get("query_type") == "document_text"):
+                    logger.debug("User documents query - processing already done in process_query, skipping get_rag_context")
+                    return None
                 else:
                     # Обычный поиск - увеличиваем top_k для получения большего контекста
                     # Ограничиваем top_k чтобы не превысить лимиты токенов
@@ -843,7 +1135,9 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                 full_text_keywords = [
                     "полный текст", "повний текст", "полный текст дела", "повний текст справи",
                     "весь текст", "весь текст дела", "весь текст справи",
-                    "текст дела", "текст справи", "покажи текст дела", "покажи текст справи"
+                    "текст дела", "текст справи", "покажи текст дела", "покажи текст справи",
+                    "дай полный текст", "дай мне полный текст", "дай текст дела", "дай мне текст дела",
+                    "покажи полный текст", "покажи мне полный текст", "покажи весь текст"
                 ]
                 is_full_text_request = any(keyword in query.lower() for keyword in full_text_keywords)
                 
@@ -868,16 +1162,21 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                                     if full_text_data and full_text_data.get('success'):
                                         text = full_text_data.get('text', '')
                                         if text:
-                                            # Ограничиваем размер полного текста для избежания ошибок 400
-                                            # gpt-4o-mini имеет лимит 128K токенов (~100K символов), но ограничиваем для безопасности
-                                            max_text_length = 50000  # ~50K символов для контекста (безопасный лимит)
+                                            # Для запросов на полный текст увеличиваем лимит, чтобы передать больше текста
+                                            # gpt-4o-mini имеет лимит 128K токенов (~100K символов)
+                                            # Оставляем место для system prompt (~2K) и user query (~1K), итого ~97K для контекста
+                                            max_text_length = 95000  # ~95K символов для полного текста (увеличенный лимит)
+                                            original_length = len(text)
                                             if len(text) > max_text_length:
-                                                logger.warning(f"Full text too long ({len(text)} chars), truncating to {max_text_length}")
+                                                logger.warning(f"Full text too long ({original_length} chars), truncating to {max_text_length}")
                                                 text = text[:max_text_length] + "\n\n[Текст обрезан из-за ограничений длины. Полный текст доступен по запросу.]"
+                                            else:
+                                                logger.info(f"Full text retrieved: {original_length} chars for case {case_number}")
                                             
                                             law_context = f"=== Полный текст дела № {case_number} ===\n\n"
                                             law_context += f"Заголовок: {case.get('title', 'N/A')}\n\n"
                                             law_context += f"Текст решения:\n{text}\n"
+                                            logger.debug(f"Law context length: {len(law_context)} chars")
                                             return law_context
                     
                     # Если полный текст не запрашивается или не получен, возвращаем детали
@@ -924,6 +1223,9 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                 logger.error(f"Error getting Law MCP context: {e}")
                 errors.append(f"Law MCP error: {str(e)}")
                 return None
+        
+        # Получаем информацию о всех документах (всегда, если есть документы)
+        documents_summary = await get_documents_summary()
         
         # Параллельное выполнение
         rag_result, law_result = await asyncio.gather(
@@ -1008,11 +1310,13 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
 В контексте тебе предоставлена информация:
 1. В разделе "=== Информация о загруженных документах ===" - полный список всех загруженных документов с их именами и количеством. Ты ВСЕГДА знаешь, сколько документов загружено и как они называются.
 2. В разделе "=== Контекст из документов ===" - релевантные фрагменты из документов по запросу пользователя.
-3. Если пользователь просит показать полный текст документа (например, "текст документа 3", "покажи документ 1"), и в контексте есть раздел "=== Полный текст документа ===", ты должен предоставить этот полный текст пользователю.
+3. В разделе "=== Контекст из документов (полные тексты) ===" - ПОЛНЫЕ ТЕКСТЫ всех загруженных документов. Это означает, что у тебя есть доступ ко всему содержимому документов, и ты можешь найти любую информацию из них, включая номера дел, даты, имена, суммы и т.д.
+4. Если пользователь просит показать полный текст документа (например, "текст документа 3", "покажи документ 1"), и в контексте есть раздел "=== Полный текст документа ===", ты должен предоставить этот полный текст пользователю.
 
 Используй эту информацию для ответа:
 - Если пользователь спрашивает о количестве документов, используй информацию из раздела "=== Информация о загруженных документах ===".
-- Если пользователь спрашивает о содержимом документов, используй информацию из раздела "=== Контекст из документов ===".
+- Если пользователь спрашивает о содержимом документов (например, "найди номер дела", "какая сумма", "когда подписан"), используй ПОЛНЫЕ ТЕКСТЫ из раздела "=== Контекст из документов (полные тексты) ===" для поиска нужной информации.
+- Если в контексте есть полные тексты документов, ты можешь найти в них ЛЮБУЮ информацию, включая номера дел, даты, имена сторон, суммы, адреса и т.д.
 - Если пользователь просит показать полный текст документа и он есть в контексте, предоставь его полностью.
 - Можешь перечислять имена документов из списка, когда это уместно.
 
@@ -1030,9 +1334,11 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
 4. В разделе "=== Полный текст дела № [номер] ===" - полный текст судебного решения (если есть).
 
 ВАЖНО:
-- Если пользователь просит показать текст дела (например, "Покажи текст дела 686/32982/23", "текст дела", "полный текст дела") и в контексте есть раздел "=== Полный текст дела № [номер] ===", ты ДОЛЖЕН предоставить этот полный текст пользователю.
-- Если в контексте есть раздел "=== Полный текст дела ===", это означает, что полный текст доступен, и ты должен его показать пользователю полностью.
+- Если пользователь просит показать текст дела (например, "Покажи текст дела 686/32982/23", "текст дела", "полный текст дела", "дай мне полный текст дела") и в контексте есть раздел "=== Полный текст дела № [номер] ===", ты ДОЛЖЕН предоставить этот полный текст пользователю ПОЛНОСТЬЮ, без сокращений и обрезаний.
+- Если в контексте есть раздел "=== Полный текст дела ===" или "=== Полный текст дела № [номер] ===", это означает, что полный текст доступен, и ты должен его показать пользователю ПОЛНОСТЬЮ, начиная с заголовка и заканчивая последним словом текста решения.
+- НЕ сокращай текст, НЕ обрезай его, НЕ говори "текст слишком длинный" - покажи ВЕСЬ текст, который есть в контексте.
 - НЕ говори, что у тебя нет доступа к полному тексту, если он есть в контексте.
+- Если пользователь просит "полный текст" или "весь текст", это означает, что он хочет увидеть ВСЁ содержимое, без исключений.
 
 Используй предоставленный контекст для формирования точного и полезного ответа.
 Если контекст содержит информацию из загруженных документов пользователя, приоритетно используй её.
@@ -1054,14 +1360,53 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             LLMMessage(role="user", content=user_prompt)
         ]
         
+        # Проверяем, является ли это запросом на полный текст дела
+        # Если в контексте есть полный текст дела, нужно установить большой max_tokens
+        is_full_text_request = any("=== Полный текст дела №" in ctx or "=== Полный текст дела ===" in ctx for ctx in contexts)
+        
+        # Проверяем, является ли это запросом о документах пользователя с полными текстами
+        is_user_documents_with_full_texts = any("=== Контекст из документов (полные тексты) ===" in ctx for ctx in contexts)
+        
+        # Определяем max_tokens в зависимости от типа запроса
+        # Для полных текстов дел нужен большой лимит, так как текст может быть очень длинным
+        if is_full_text_request:
+            # Для полного текста дела устанавливаем большой max_tokens
+            # gpt-4o-mini имеет лимит 128K токенов на контекст + ответ
+            # Если контекст ~100K символов (~80K токенов), оставляем ~40K токенов для ответа
+            max_tokens = 40000  # ~40K токенов для ответа (достаточно для длинного текста)
+            logger.info(f"Full text case request detected, setting max_tokens={max_tokens}")
+        elif is_user_documents_with_full_texts:
+            # Для запросов о документах пользователя с полными текстами также нужен увеличенный лимит
+            # Контекст может быть большим (~90K символов), поэтому оставляем достаточно места для ответа
+            max_tokens = 30000  # ~30K токенов для ответа (достаточно для анализа документов)
+            logger.info(f"User documents query with full texts detected, setting max_tokens={max_tokens}")
+        else:
+            # Для обычных запросов используем дефолтное значение или разумный лимит
+            max_tokens = None  # Используем дефолт модели (обычно 16K для gpt-4o-mini)
+        
         # Логируем промпт для отладки (первые 500 символов)
         logger.info(f"Sending to LLM provider: {llm_provider.value if llm_provider else 'default'}, model: {model or 'default'}")
-        logger.info(f"RAG enabled: {use_rag}, Law enabled: {use_law}, Contexts count: {len(contexts)}")
-        logger.debug(f"Sending to LLM - System prompt length: {len(system_prompt)}, User prompt length: {len(user_prompt)}")
+        logger.info(f"RAG enabled: {use_rag}, Law enabled: {use_law}, Contexts count: {len(contexts)}, is_full_text_request: {is_full_text_request}, is_user_documents_with_full_texts: {is_user_documents_with_full_texts}")
+        logger.info(f"Query type: {query_type}, Classification: {classification}")
+        logger.info(f"Sending to LLM - System prompt length: {len(system_prompt)}, User prompt length: {len(user_prompt)}, max_tokens: {max_tokens}")
+        
+        # Детальное логирование контекста для запросов о документах пользователя
+        if is_user_documents_with_full_texts:
+            logger.info(f"=== USER DOCUMENTS QUERY DEBUG ===")
+            logger.info(f"Query: '{query}'")
+            logger.info(f"Total contexts: {len(contexts)}")
+            for i, ctx in enumerate(contexts, 1):
+                logger.info(f"Context {i} type: {'Full texts' if 'полные тексты' in ctx else 'Other'}, length: {len(ctx)} chars")
+                if 'полные тексты' in ctx:
+                    # Логируем количество документов в контексте
+                    doc_count = ctx.count('=== Полный текст документа')
+                    logger.info(f"  Contains {doc_count} full document texts")
+                    logger.info(f"  Preview (first 1000 chars): {ctx[:1000]}...")
+        
         logger.debug(f"User prompt preview: {user_prompt[:500]}...")
         
         try:
-            response = await llm.generate(messages, temperature=0.7)
+            response = await llm.generate(messages, temperature=0.7, max_tokens=max_tokens)
             
             result = {
                 "answer": response.content,
@@ -1117,13 +1462,63 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
         Yields:
             Части ответа
         """
-        # Проверка наличия документов в RAG
-        has_docs = await self.rag_service.has_documents()
-        
-        # Проверяем, есть ли в запросе номер дела (формат: число/число/число)
+        # Проверяем, является ли это запросом на полный текст дела
+        # Если да, возвращаем текст напрямую из MCP, минуя LLM
         import re
         case_number_pattern = r'\d+/\d+/\d+'
-        has_case_number = re.search(case_number_pattern, query) is not None
+        case_number_match = re.search(case_number_pattern, query)
+        has_case_number = case_number_match is not None
+        
+        # Проверяем, запрашивается ли полный текст дела
+        full_text_keywords = [
+            "полный текст", "повний текст", "полный текст дела", "повний текст справи",
+            "весь текст", "весь текст дела", "весь текст справи",
+            "текст дела", "текст справи", "покажи текст дела", "покажи текст справи",
+            "дай полный текст", "дай мне полный текст", "дай текст дела", "дай мне текст дела",
+            "покажи полный текст", "покажи мне полный текст", "покажи весь текст"
+        ]
+        is_full_text_request = any(keyword in query.lower() for keyword in full_text_keywords)
+        
+        # Если это запрос на полный текст дела с номером, возвращаем напрямую из MCP
+        if has_case_number and is_full_text_request:
+            case_number = case_number_match.group(0)
+            logger.info(f"Direct full text request detected for case {case_number}, bypassing LLM")
+            
+            try:
+                # Получаем детали дела по номеру
+                details = await self.law_client.get_case_details(case_number=case_number)
+                if details and details.get('success'):
+                    cases_list = details.get('cases', [])
+                    if cases_list:
+                        case = cases_list[0]
+                        doc_id = case.get('doc_id') or case.get('id')
+                        
+                        if doc_id:
+                            # Получаем полный текст
+                            full_text_data = await self.law_client.get_case_full_text(str(doc_id))
+                            if full_text_data and full_text_data.get('success'):
+                                text = full_text_data.get('text', '')
+                                if text:
+                                    # Форматируем ответ для клиента
+                                    title = case.get('title', 'N/A')
+                                    response = f"Вот полный текст дела № {case_number}:\n\n"
+                                    response += f"Заголовок: {title}\n\n"
+                                    response += f"Текст решения:\n{text}\n"
+                                    
+                                    # Отправляем ответ по частям для streaming
+                                    chunk_size = 1000  # Отправляем по 1000 символов за раз
+                                    for i in range(0, len(response), chunk_size):
+                                        chunk = response[i:i + chunk_size]
+                                        yield chunk
+                                    return
+            
+            except Exception as e:
+                logger.error(f"Error getting full text directly from MCP: {e}")
+                yield f"Ошибка при получении полного текста дела: {str(e)}\n"
+                return
+        
+        # Проверка наличия документов в RAG
+        has_docs = await self.rag_service.has_documents()
         
         # По умолчанию используем оба источника для лучшего контекста
         if use_law is None:
@@ -1136,8 +1531,105 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             use_law = True
             logger.info(f"Case number detected, ensuring MCP Law is enabled: {query}")
         
-        # Классификация запроса через LLM (для определения типа запроса, но не для переключения источников)
+        # Классификация запроса через LLM
         classification = await self._classify_query_llm(query)
+        logger.info(f"LLM classification in stream: query_type={classification.get('query_type')}, use_rag={classification.get('use_rag')}, use_law={classification.get('use_law')}")
+        
+        # Специальная обработка для запросов о документах пользователя - обрабатываем каждый документ отдельно через LLM
+        if classification and use_rag and has_docs and classification.get("query_type") == "user_documents":
+            logger.info(f"User documents query detected in stream, processing each document separately through LLM: '{query[:100]}...'")
+            
+            documents = await self.rag_service.list_documents()
+            if not documents:
+                yield "Нет загруженных документов для поиска."
+                return
+            
+            logger.info(f"Found {len(documents)} documents, processing each one separately through LLM")
+            
+            # Получаем LLM провайдер
+            llm = LLMProviderFactory.get_provider(llm_provider, model)
+            
+            # Системный промпт для поиска в документе
+            doc_search_prompt = """Ты - помощник для поиска информации в документах.
+Пользователь задал вопрос. В контексте предоставлен полный текст одного документа.
+Твоя задача - найти ответ на вопрос пользователя в этом документе.
+
+Если ты нашел ответ - укажи его четко и конкретно.
+Если ответа нет в этом документе - ответь "Не найдено в этом документе".
+
+Отвечай кратко и по делу."""
+            
+            found_answer = False
+            
+            # Обрабатываем каждый документ отдельно
+            for i, doc in enumerate(documents, 1):
+                filename = doc.get('filename') or doc.get('file_path', 'Unknown')
+                logger.info(f"Processing document {i}/{len(documents)}: {filename}")
+                
+                # Получаем все чанки документа (полный текст)
+                chunks = await self.rag_service.get_document_chunks(filename)
+                if not chunks:
+                    logger.warning(f"No chunks found for document {i}: {filename}")
+                    continue
+                
+                # Объединяем все чанки в полный текст
+                full_text = "\n\n".join([chunk.get('text', '') for chunk in chunks if chunk.get('text')])
+                
+                if not full_text or not full_text.strip():
+                    logger.warning(f"Empty text for document {i}: {filename}")
+                    continue
+                
+                # Ограничиваем длину документа для одного запроса
+                max_doc_length = 80000  # ~80K символов для одного документа
+                if len(full_text) > max_doc_length:
+                    logger.warning(f"Document '{filename}' too long ({len(full_text)} chars), truncating to {max_doc_length}")
+                    full_text = full_text[:max_doc_length] + "\n\n[Текст документа обрезан из-за ограничений длины]"
+                
+                # Формируем промпт для LLM
+                doc_context = f"=== Полный текст документа {i}: {filename} ===\n\n{full_text}"
+                user_message = f"{query}\n\n{doc_context}"
+                
+                messages = [
+                    LLMMessage(role="system", content=doc_search_prompt),
+                    LLMMessage(role="user", content=user_message)
+                ]
+                
+                try:
+                    # Отправляем запрос в LLM для этого документа
+                    logger.info(f"Sending query to LLM for document {i}/{len(documents)}: {filename}")
+                    
+                    # Для stream используем stream_generate
+                    answer_parts = []
+                    async for chunk in llm.stream_generate(messages, temperature=0.3, max_tokens=2000):
+                        answer_parts.append(chunk)
+                        # Если еще не нашли ответ, отправляем чанки пользователю
+                        if not found_answer:
+                            yield chunk
+                    
+                    answer = "".join(answer_parts).strip()
+                    logger.info(f"LLM response for document {i} '{filename}': {answer[:200]}...")
+                    
+                    # Проверяем, содержит ли ответ полезную информацию
+                    if answer and answer.lower() not in ["не найдено в этом документе", "не найдено", "not found", "немає в цьому документі"]:
+                        found_answer = True
+                        logger.info(f"✅ Answer found in document {i}: {filename}")
+                        # Если нашли ответ, продолжаем до последнего документа, но уже не отправляем результаты
+                        # (они уже отправлены выше через yield)
+                    else:
+                        logger.debug(f"No answer found in document {i}: {filename}")
+                
+                except Exception as e:
+                    logger.error(f"Error processing document {i} '{filename}' through LLM: {e}")
+                    if not found_answer:
+                        yield f"\n\n[Ошибка при обработке документа {i}: {filename}]\n"
+            
+            # После обработки всех документов отправляем финальное сообщение
+            if found_answer:
+                yield f"\n\n(Проверено документов: {len(documents)})"
+            else:
+                yield f"\n\nПроверены все {len(documents)} документов, но информация не найдена."
+            
+            return
         
         # Если это запрос на удаление, обрабатываем его сразу (для stream возвращаем текст)
         if classification.get("is_delete_query"):
@@ -1249,8 +1741,37 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             
             if target_document:
                 filename = target_document.get('filename') or target_document.get('file_path')
-                # Получаем все чанки документа
+                file_path = target_document.get('file_path') or filename
+                
+                logger.info(f"Looking for document chunks in stream: filename='{filename}', file_path='{file_path}'")
+                
+                # Пробуем получить чанки по разным вариантам имени файла
                 chunks = await self.rag_service.get_document_chunks(filename)
+                
+                # Если не нашли, пробуем по file_path
+                if not chunks and file_path and file_path != filename:
+                    logger.debug(f"Chunks not found by filename, trying file_path: '{file_path}'")
+                    chunks = await self.rag_service.get_document_chunks(file_path)
+                
+                # Если все еще не нашли, пробуем по базовому имени файла
+                if not chunks:
+                    import os
+                    basename = os.path.basename(filename)
+                    if basename != filename:
+                        logger.debug(f"Chunks not found, trying basename: '{basename}'")
+                        chunks = await self.rag_service.get_document_chunks(basename)
+                
+                # Если все еще не нашли, пробуем с нормализованным расширением
+                if not chunks:
+                    import os
+                    basename = os.path.basename(filename)
+                    # Пробуем с нижним регистром расширения
+                    if basename.upper().endswith('.PDF'):
+                        basename_lower = basename[:-4] + '.pdf'
+                        logger.debug(f"Chunks not found, trying lowercase extension: '{basename_lower}'")
+                        chunks = await self.rag_service.get_document_chunks(basename_lower)
+                
+                logger.info(f"Found {len(chunks)} chunks for document '{filename}' in stream")
                 
                 if chunks:
                     # Объединяем все чанки в полный текст
@@ -1261,7 +1782,31 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                     else:
                         yield f"Документ '{filename}' найден, но текст не извлечен или пуст."
                 else:
-                    yield f"Документ '{filename}' найден, но чанки не найдены. Возможно, документ еще обрабатывается."
+                    logger.warning(f"Document '{filename}' found in list but chunks not found in stream. Trying to find by searching all documents...")
+                    # Пробуем найти документ в списке всех документов по имени
+                    all_docs = await self.rag_service.list_documents()
+                    matching_docs = []
+                    import os
+                    target_basename = os.path.basename(filename).lower()
+                    for doc in all_docs:
+                        doc_filename = (doc.get('filename') or doc.get('file_path', '')).lower()
+                        doc_basename = os.path.basename(doc_filename).lower()
+                        if target_basename == doc_basename:
+                            matching_docs.append(doc)
+                    
+                    if matching_docs:
+                        # Пробуем получить чанки для найденного документа
+                        for doc in matching_docs:
+                            alt_filename = doc.get('filename') or doc.get('file_path')
+                            logger.debug(f"Trying alternative filename in stream: '{alt_filename}'")
+                            chunks = await self.rag_service.get_document_chunks(alt_filename)
+                            if chunks:
+                                full_text = "\n\n".join([chunk.get('text', '') for chunk in chunks if chunk.get('text')])
+                                if full_text:
+                                    yield f"=== Полный текст документа: {alt_filename} ===\n\n{full_text}"
+                                    return
+                    
+                    yield f"Документ '{filename}' найден в списке, но чанки не найдены. Возможно, документ еще обрабатывается или возникла проблема с индексацией. Попробуйте перезагрузить документ."
             else:
                 # Не нашли документ, возвращаем список
                 doc_list = "\n".join([f"{i+1}. {doc.get('filename') or doc.get('file_path')}" for i, doc in enumerate(documents[:10])])
@@ -1345,6 +1890,11 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                         if context_parts:
                             return f"=== Список всех загруженных документов ===\n\n" + "\n\n".join(context_parts)
                     return None
+                # Для user_documents запросов обработка происходит в stream_process_query до вызова get_rag_context
+                # Здесь возвращаем None, так как обработка уже выполнена
+                if classification and (classification.get("query_type") == "user_documents" or classification.get("query_type") == "document_text"):
+                    logger.debug("User documents query in stream - processing already done, skipping get_rag_context")
+                    return None
                 else:
                     # Обычный поиск - увеличиваем top_k для получения большего контекста
                     # Ограничиваем top_k чтобы не превысить лимиты токенов
@@ -1359,7 +1909,6 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             except Exception as e:
                 logger.error(f"Error getting RAG context: {e}")
                 return None
-        
         async def get_law_context():
             if not use_law:
                 return None
@@ -1371,7 +1920,9 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                 full_text_keywords = [
                     "полный текст", "повний текст", "полный текст дела", "повний текст справи",
                     "весь текст", "весь текст дела", "весь текст справи",
-                    "текст дела", "текст справи", "покажи текст дела", "покажи текст справи"
+                    "текст дела", "текст справи", "покажи текст дела", "покажи текст справи",
+                    "дай полный текст", "дай мне полный текст", "дай текст дела", "дай мне текст дела",
+                    "покажи полный текст", "покажи мне полный текст", "покажи весь текст"
                 ]
                 is_full_text_request = any(keyword in query.lower() for keyword in full_text_keywords)
                 
@@ -1396,16 +1947,21 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
                                     if full_text_data and full_text_data.get('success'):
                                         text = full_text_data.get('text', '')
                                         if text:
-                                            # Ограничиваем размер полного текста для избежания ошибок 400
-                                            # gpt-4o-mini имеет лимит 128K токенов (~100K символов), но ограничиваем для безопасности
-                                            max_text_length = 50000  # ~50K символов для контекста (безопасный лимит)
+                                            # Для запросов на полный текст увеличиваем лимит, чтобы передать больше текста
+                                            # gpt-4o-mini имеет лимит 128K токенов (~100K символов)
+                                            # Оставляем место для system prompt (~2K) и user query (~1K), итого ~97K для контекста
+                                            max_text_length = 95000  # ~95K символов для полного текста (увеличенный лимит)
+                                            original_length = len(text)
                                             if len(text) > max_text_length:
-                                                logger.warning(f"Full text too long ({len(text)} chars), truncating to {max_text_length}")
+                                                logger.warning(f"Full text too long ({original_length} chars), truncating to {max_text_length}")
                                                 text = text[:max_text_length] + "\n\n[Текст обрезан из-за ограничений длины. Полный текст доступен по запросу.]"
+                                            else:
+                                                logger.info(f"Full text retrieved: {original_length} chars for case {case_number}")
                                             
                                             law_context = f"=== Полный текст дела № {case_number} ===\n\n"
                                             law_context += f"Заголовок: {case.get('title', 'N/A')}\n\n"
                                             law_context += f"Текст решения:\n{text}\n"
+                                            logger.debug(f"Law context length: {len(law_context)} chars")
                                             return law_context
                     
                     # Если полный текст не запрашивается или не получен, возвращаем детали
@@ -1537,9 +2093,11 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
 4. В разделе "=== Полный текст дела № [номер] ===" - полный текст судебного решения (если есть).
 
 ВАЖНО:
-- Если пользователь просит показать текст дела (например, "Покажи текст дела 686/32982/23", "текст дела", "полный текст дела") и в контексте есть раздел "=== Полный текст дела № [номер] ===", ты ДОЛЖЕН предоставить этот полный текст пользователю.
-- Если в контексте есть раздел "=== Полный текст дела ===", это означает, что полный текст доступен, и ты должен его показать пользователю полностью.
+- Если пользователь просит показать текст дела (например, "Покажи текст дела 686/32982/23", "текст дела", "полный текст дела", "дай мне полный текст дела") и в контексте есть раздел "=== Полный текст дела № [номер] ===", ты ДОЛЖЕН предоставить этот полный текст пользователю ПОЛНОСТЬЮ, без сокращений и обрезаний.
+- Если в контексте есть раздел "=== Полный текст дела ===" или "=== Полный текст дела № [номер] ===", это означает, что полный текст доступен, и ты должен его показать пользователю ПОЛНОСТЬЮ, начиная с заголовка и заканчивая последним словом текста решения.
+- НЕ сокращай текст, НЕ обрезай его, НЕ говори "текст слишком длинный" - покажи ВЕСЬ текст, который есть в контексте.
 - НЕ говори, что у тебя нет доступа к полному тексту, если он есть в контексте.
+- Если пользователь просит "полный текст" или "весь текст", это означает, что он хочет увидеть ВСЁ содержимое, без исключений.
 
 Используй предоставленный контекст для формирования точного и полезного ответа.
 Если контекст содержит информацию из загруженных документов пользователя, приоритетно используй её.
@@ -1554,8 +2112,8 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
         
         # Проверяем длину промпта - OpenAI имеет лимиты
         # gpt-4o-mini имеет лимит 128K токенов (~100K символов), но ограничиваем для безопасности
-        # Оставляем место для system prompt, user query и ответа
-        max_user_prompt_length = 80000  # ~80K символов для user prompt (безопасный лимит для 128K токенов)
+        # Оставляем место для system prompt (~2K), user query (~1K) и ответа (~5K), итого ~92K для контекста
+        max_user_prompt_length = 92000  # ~92K символов для user prompt (увеличенный лимит для полных текстов дел)
         if len(user_prompt) > max_user_prompt_length:
             logger.warning(f"User prompt too long ({len(user_prompt)} chars), truncating to {max_user_prompt_length}")
             user_prompt = user_prompt[:max_user_prompt_length] + "\n\n[Текст обрезан из-за ограничений длины]"
@@ -1564,12 +2122,14 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             logger.warning(f"System prompt too long ({len(system_prompt)} chars), truncating to 5000")
             system_prompt = system_prompt[:5000]
         
-        # Проверяем общую длину всех контекстов (128K токенов = ~100K символов)
+        # Проверяем общую длину всех контекстов (128K токенов = ~100K символов, но оставляем запас)
+        # Увеличиваем лимит для запросов на полный текст дела
         total_context_length = len(user_prompt) + len(system_prompt)
-        if total_context_length > 100000:
-            logger.warning(f"Total context too long ({total_context_length} chars), truncating user prompt")
-            # Обрезаем user_prompt чтобы общая длина была ~100K
-            max_user_len = 100000 - len(system_prompt) - 1000  # -1000 для буфера
+        max_total_length = 120000  # ~120K символов (увеличенный лимит для полных текстов дел)
+        if total_context_length > max_total_length:
+            logger.warning(f"Total context too long ({total_context_length} chars), truncating user prompt to fit {max_total_length}")
+            # Обрезаем user_prompt чтобы общая длина была в пределах лимита
+            max_user_len = max_total_length - len(system_prompt) - 2000  # -2000 для буфера и ответа
             if max_user_len > 0:
                 user_prompt = user_prompt[:max_user_len] + "\n\n[Текст обрезан из-за ограничений длины]"
             else:
@@ -1582,16 +2142,40 @@ Example: {{"use_law": true, "use_rag": false, "query_type": "legal", "has_case_n
             LLMMessage(role="user", content=user_prompt)
         ]
         
+        # Проверяем, является ли это запросом на полный текст дела
+        # Если в контексте есть полный текст дела, нужно установить большой max_tokens
+        is_full_text_request = any("=== Полный текст дела №" in ctx or "=== Полный текст дела ===" in ctx for ctx in contexts)
+        
+        # Проверяем, является ли это запросом о документах пользователя с полными текстами
+        is_user_documents_with_full_texts = any("=== Контекст из документов (полные тексты) ===" in ctx for ctx in contexts)
+        
+        # Определяем max_tokens в зависимости от типа запроса
+        # Для полных текстов дел нужен большой лимит, так как текст может быть очень длинным
+        if is_full_text_request:
+            # Для полного текста дела устанавливаем большой max_tokens
+            # gpt-4o-mini имеет лимит 128K токенов на контекст + ответ
+            # Если контекст ~100K символов (~80K токенов), оставляем ~40K токенов для ответа
+            max_tokens = 40000  # ~40K токенов для ответа (достаточно для длинного текста)
+            logger.info(f"Full text case request detected, setting max_tokens={max_tokens}")
+        elif is_user_documents_with_full_texts:
+            # Для запросов о документах пользователя с полными текстами также нужен увеличенный лимит
+            # Контекст может быть большим (~90K символов), поэтому оставляем достаточно места для ответа
+            max_tokens = 30000  # ~30K токенов для ответа (достаточно для анализа документов)
+            logger.info(f"User documents query with full texts detected in stream, setting max_tokens={max_tokens}")
+        else:
+            # Для обычных запросов используем дефолтное значение или разумный лимит
+            max_tokens = None  # Используем дефолт модели (обычно 16K для gpt-4o-mini)
+        
         # Логируем промпт для отладки
         logger.info(f"Stream sending to LLM provider: {llm_provider.value if llm_provider else 'default'}, model: {model or 'default'}")
-        logger.info(f"RAG enabled: {use_rag}, Law enabled: {use_law}, Contexts count: {len(contexts)}")
-        logger.debug(f"Stream sending to LLM - System prompt length: {len(system_prompt)}, User prompt length: {len(user_prompt)}, contains context: {bool(contexts)}")
+        logger.info(f"RAG enabled: {use_rag}, Law enabled: {use_law}, Contexts count: {len(contexts)}, is_full_text_request: {is_full_text_request}, is_user_documents_with_full_texts: {is_user_documents_with_full_texts}")
+        logger.debug(f"Stream sending to LLM - System prompt length: {len(system_prompt)}, User prompt length: {len(user_prompt)}, contains context: {bool(contexts)}, max_tokens: {max_tokens}")
         
         try:
             # Для stream мы не можем вернуть suggested_actions в потоке,
             # но можем добавить их в метаданные через специальный формат
             # Пока просто генерируем поток ответа
-            async for chunk in llm.stream_generate(messages, temperature=0.7):
+            async for chunk in llm.stream_generate(messages, temperature=0.7, max_tokens=max_tokens):
                 yield chunk
         except Exception as e:
             logger.error(f"Error streaming LLM response: {e}")

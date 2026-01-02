@@ -35,7 +35,7 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - TZ=Europe/Kiev
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/6333 && echo -e 'GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n' >&3 && cat <&3 | grep -q '200 OK' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

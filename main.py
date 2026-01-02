@@ -619,6 +619,63 @@ async def get_case(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/mcp/law/case/{case_number}/full-text")
+async def get_case_full_text_by_number(
+    case_number: str,
+    law_client: LawMCPClient = Depends(get_law_client)
+):
+    """
+    Получение полного текста дела по номеру дела (напрямую из MCP, без LLM)
+    
+    Args:
+        case_number: Номер дела (формат: число/число/число)
+        law_client: Law MCP клиент (stateless, создается через DI)
+        
+    Returns:
+        Полный текст дела в формате для клиента
+    """
+    try:
+        # Получаем детали дела по номеру
+        details = await law_client.get_case_details(case_number=case_number)
+        if not details or not details.get('success'):
+            raise HTTPException(status_code=404, detail=f"Case {case_number} not found")
+        
+        cases_list = details.get('cases', [])
+        if not cases_list:
+            raise HTTPException(status_code=404, detail=f"Case {case_number} not found")
+        
+        # Берем первое дело из списка
+        case = cases_list[0]
+        doc_id = case.get('doc_id') or case.get('id')
+        
+        if not doc_id:
+            raise HTTPException(status_code=404, detail=f"Case {case_number} has no doc_id")
+        
+        # Получаем полный текст
+        full_text_data = await law_client.get_case_full_text(str(doc_id))
+        if not full_text_data or not full_text_data.get('success'):
+            raise HTTPException(status_code=404, detail=f"Full text for case {case_number} not found")
+        
+        text = full_text_data.get('text', '')
+        if not text:
+            raise HTTPException(status_code=404, detail=f"Full text for case {case_number} is empty")
+        
+        # Форматируем ответ для клиента
+        return {
+            "success": True,
+            "case_number": case_number,
+            "title": case.get('title', 'N/A'),
+            "text": text,
+            "doc_id": str(doc_id)
+        }
+    except HTTPException:
+        # Пробрасываем HTTPException как есть
+        raise
+    except Exception as e:
+        logger.error(f"Error getting case full text by number: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/mcp/law/case/{doc_id}/full-text")
 async def get_case_full_text(
     doc_id: str,
