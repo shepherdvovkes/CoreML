@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Вибір: апеляція чи касація - /appeal -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран вибору оскарження">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Оскарження</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Оберіть тип — підкажемо строки</text>
+            <text x="42" y="163" fill="rgba(255,255,255,0.64)" font-size="12">та потрібні документи</text>
+
+            <rect x="42" y="176" width="306" height="112" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(59,130,246,0.90)"/>
+            <circle cx="66" cy="216" r="10" fill="#3b82f6"/>
+            <text x="88" y="212" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="800">Апеляція</text>
+            <text x="88" y="234" fill="rgba(255,255,255,0.56)" font-size="12">Переоцінка фактів і доказів</text>
+            <text x="88" y="256" fill="rgba(245,158,11,0.95)" font-size="11">Строк: обмежений (покажемо дедлайн)</text>
+
+            <rect x="42" y="300" width="306" height="112" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+            <circle cx="66" cy="340" r="10" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.30)"/>
+            <text x="88" y="336" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="800">Касація</text>
+            <text x="88" y="358" fill="rgba(255,255,255,0.56)" font-size="12">Перевірка застосування закону</text>
+            <text x="88" y="380" fill="rgba(255,255,255,0.46)" font-size="11">Зазвичай після апеляції (є винятки)</text>
+
+            <rect x="42" y="434" width="306" height="120" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="464" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Що потрібно</text>
+            <text x="60" y="490" fill="rgba(255,255,255,0.64)" font-size="12">- Рішення суду (копія)</text>
+            <text x="60" y="512" fill="rgba(255,255,255,0.64)" font-size="12">- Матеріали справи / докази (якщо є)</text>
+            <text x="60" y="534" fill="rgba(255,255,255,0.64)" font-size="12">- Дата отримання рішення (для строку)</text>
+
+            <rect x="42" y="584" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="619" fill="white" font-size="16" font-weight="700" text-anchor="middle">Продовжити</text>
+
+            <text x="42" y="702" fill="rgba(255,255,255,0.46)" font-size="11">Важливо: покажемо дедлайн і попередимо, якщо строк спливає</text>
+          </svg>

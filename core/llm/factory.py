@@ -52,7 +52,7 @@ class LLMProviderFactory:
             return OpenAIProvider(
                 base_url=settings.openai_base_url,
                 api_key=settings.openai_api_key,
-                model=model or "gpt-3.5-turbo"
+                model=model or "gpt-4o-mini"
             )
         elif provider_type == LLMProvider.LMSTUDIO:
             return LMStudioProvider(
@@ -223,7 +223,7 @@ class LLMProviderFactory:
             }
             
             if provider == LLMProvider.OPENAI:
-                provider_info["default_model"] = "gpt-3.5-turbo"
+                provider_info["default_model"] = "gpt-4o-mini"
                 provider_info["base_url"] = settings.openai_base_url
                 provider_info["requires_api_key"] = bool(settings.openai_api_key)
             elif provider == LLMProvider.LMSTUDIO:

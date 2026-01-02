@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран 1 — Вітання - /start -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран 1">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#1d4ed8" stop-opacity="0.35"/>
+                <stop offset="0.7" stop-color="#22c55e" stop-opacity="0.10"/>
+                <stop offset="1" stop-color="#0b1220" stop-opacity="1"/>
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="url(#g1)"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="140" fill="rgba(255,255,255,0.92)" font-size="22" font-weight="700">Підготуємо документи</text>
+            <text x="42" y="168" fill="rgba(255,255,255,0.92)" font-size="22" font-weight="700">для суду</text>
+
+            <text x="42" y="214" fill="rgba(255,255,255,0.64)" font-size="13">Завантажте документи, дайте відповіді на кілька питань —</text>
+            <text x="42" y="234" fill="rgba(255,255,255,0.64)" font-size="13">ми підготуємо чернетку та організуємо консультацію юриста.</text>
+
+            <rect x="42" y="584" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="619" fill="white" font-size="16" font-weight="700" text-anchor="middle">Почати заяву</text>
+
+            <rect x="42" y="656" width="306" height="36" rx="12" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="195" y="679" fill="rgba(255,255,255,0.72)" font-size="12" text-anchor="middle">Як це працює?</text>
+
+            <!-- bottom info -->
+            <text x="195" y="736" fill="rgba(255,255,255,0.46)" font-size="11" text-anchor="middle">Оплата лише на етапі консультації та доставки</text>
+          </svg>

@@ -52,9 +52,9 @@ def process_document_task(
     Returns:
         dict: Результат обработки
     """
+    temp_file_path = None  # Инициализируем до try блока для использования в except
     try:
         rag_service = get_rag_service()
-        temp_file_path = None
         
         # Если передан контент, сохраняем во временный файл
         if file_content and filename:

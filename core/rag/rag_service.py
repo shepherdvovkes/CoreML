@@ -196,12 +196,46 @@ class RAGService:
         # Получение результатов поиска
         results = await self.search(query, top_k)
         
-        # Формирование контекста без технических меток
+        # Формирование структурированного контекста с метаданными
         context_parts = []
+        current_doc = None
+        current_doc_type = None
+        doc_chunks = []
+        
         for result in results:
             text = result.get('text', '').strip()
-            if text:
-                context_parts.append(text)
+            if not text:
+                continue
+                
+            metadata = result.get('metadata', {})
+            filename = metadata.get('filename') or metadata.get('file_path', 'Unknown')
+            doc_type = metadata.get('document_type', 'unknown')
+            
+            # Группируем чанки по документам
+            if current_doc != filename:
+                # Сохраняем предыдущий документ
+                if current_doc and doc_chunks:
+                    doc_header = f"📄 Документ: {current_doc}"
+                    if current_doc_type and current_doc_type != 'unknown':
+                        doc_header += f" (тип: {current_doc_type})"
+                    context_parts.append(doc_header)
+                    context_parts.extend(doc_chunks)
+                    context_parts.append("")  # Разделитель между документами
+                
+                # Начинаем новый документ
+                current_doc = filename
+                current_doc_type = doc_type
+                doc_chunks = []
+            
+            doc_chunks.append(text)
+        
+        # Добавляем последний документ
+        if current_doc and doc_chunks:
+            doc_header = f"📄 Документ: {current_doc}"
+            if current_doc_type and current_doc_type != 'unknown':
+                doc_header += f" (тип: {current_doc_type})"
+            context_parts.append(doc_header)
+            context_parts.extend(doc_chunks)
         
         context = "\n\n".join(context_parts)
         

@@ -1,0 +1,38 @@
+# Dockerfile для Playwright сервиса скриншотов HTML
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Установка Python зависимостей
+WORKDIR /app
+
+# Копирование requirements для Playwright сервиса
+COPY requirements-playwright.txt /app/requirements-playwright.txt
+RUN pip3 install --no-cache-dir -r requirements-playwright.txt
+
+# Установка браузеров Playwright
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Копирование структуры проекта
+COPY services/ /app/services/
+COPY core/ /app/core/
+COPY config.py /app/config.py
+
+# Создание директории для временных файлов
+RUN mkdir -p /app/tmp
+
+# Переменные окружения
+ENV PYTHONUNBUFFERED=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Порт для FastAPI сервера
+EXPOSE 3015
+
+# Запуск сервиса
+CMD ["python3", "/app/services/html_screenshot_service.py"]
+

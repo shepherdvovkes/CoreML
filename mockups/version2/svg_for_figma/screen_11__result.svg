@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Проєкт готовий - /result -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран результату">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Ваш проєкт готовий</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Завантажте документи та оберіть</text>
+            <text x="42" y="163" fill="rgba(255,255,255,0.64)" font-size="12">спосіб подачі до суду</text>
+
+            <rect x="42" y="176" width="306" height="156" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="206" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Позовна заява</text>
+            <text x="60" y="228" fill="rgba(255,255,255,0.56)" font-size="12">Готово до друку й подачі</text>
+
+            <rect x="60" y="250" width="128" height="40" rx="14" fill="#3b82f6"/>
+            <text x="124" y="276" fill="white" font-size="12" font-weight="700" text-anchor="middle">Перегляд PDF</text>
+
+            <rect x="200" y="250" width="128" height="40" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="264" y="276" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650" text-anchor="middle">Завантажити</text>
+
+            <rect x="42" y="350" width="306" height="206" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="380" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">План дій</text>
+
+            <!-- timeline -->
+            <circle cx="70" cy="410" r="6" fill="#3b82f6"/>
+            <rect x="69" y="416" width="2" height="92" fill="rgba(255,255,255,0.18)"/>
+            <circle cx="70" cy="452" r="6" fill="rgba(255,255,255,0.30)"/>
+            <circle cx="70" cy="502" r="6" fill="rgba(255,255,255,0.30)"/>
+
+            <text x="90" y="414" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">Сьогодні</text>
+            <text x="90" y="434" fill="rgba(255,255,255,0.64)" font-size="12">Перевірте дані й підпишіть заяву</text>
+
+            <text x="90" y="456" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">Завтра</text>
+            <text x="90" y="476" fill="rgba(255,255,255,0.64)" font-size="12">Оберіть доставку / подайте самі</text>
+
+            <text x="90" y="506" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">Через 5 днів</text>
+            <text x="90" y="526" fill="rgba(255,255,255,0.64)" font-size="12">Очікуйте сповіщення / трек-номер</text>
+
+            <rect x="42" y="584" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="619" fill="white" font-size="16" font-weight="700" text-anchor="middle">Як подати до суду?</text>
+
+            <g>
+              <rect x="42" y="682" width="306" height="10" rx="6" fill="rgba(255,255,255,0.10)"/>
+              <rect x="42" y="682" width="306" height="10" rx="6" fill="#3b82f6"/>
+              <text x="42" y="712" fill="rgba(255,255,255,0.46)" font-size="11">Документи → Консультація → Підсумок</text>
+            </g>
+          </svg>

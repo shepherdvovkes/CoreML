@@ -486,6 +486,84 @@ async def get_document_preview(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/rag/documents/{filename}")
+async def delete_document(
+    filename: str,
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    """
+    Удаление документа по имени файла
+    
+    Args:
+        filename: Имя файла документа
+        rag_service: RAG сервис (stateless, создается через DI)
+        
+    Returns:
+        Результат удаления
+    """
+    try:
+        deleted = await rag_service.delete_document(filename)
+        if deleted:
+            return {
+                "status": "success",
+                "message": f"Document '{filename}' deleted successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail=f"Document '{filename}' not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/rag/documents")
+async def delete_all_documents(
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    """
+    Удаление всех документов
+    
+    Args:
+        rag_service: RAG сервис (stateless, создается через DI)
+        
+    Returns:
+        Результат удаления
+    """
+    try:
+        documents = await rag_service.list_documents()
+        if not documents:
+            return {
+                "status": "success",
+                "message": "No documents to delete",
+                "deleted_count": 0
+            }
+        
+        deleted_count = 0
+        errors = []
+        for doc in documents:
+            filename = doc.get('filename') or doc.get('file_path')
+            if filename:
+                try:
+                    deleted = await rag_service.delete_document(filename)
+                    if deleted:
+                        deleted_count += 1
+                except Exception as e:
+                    errors.append(f"Error deleting '{filename}': {str(e)}")
+                    logger.error(f"Error deleting document '{filename}': {e}")
+        
+        return {
+            "status": "success",
+            "message": f"Deleted {deleted_count} out of {len(documents)} documents",
+            "deleted_count": deleted_count,
+            "total_count": len(documents),
+            "errors": errors if errors else None
+        }
+    except Exception as e:
+        logger.error(f"Error deleting all documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/mcp/law/search-cases")
 async def search_cases(
     query: str = Query(...),
@@ -538,6 +616,34 @@ async def get_case(
         raise
     except Exception as e:
         logger.error(f"Error getting case: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mcp/law/case/{doc_id}/full-text")
+async def get_case_full_text(
+    doc_id: str,
+    law_client: LawMCPClient = Depends(get_law_client)
+):
+    """
+    Получение полного текста дела по doc_id
+    
+    Args:
+        doc_id: ID документа
+        law_client: Law MCP клиент (stateless, создается через DI)
+        
+    Returns:
+        Полный текст дела
+    """
+    try:
+        full_text = await law_client.get_case_full_text(doc_id)
+        if not full_text:
+            raise HTTPException(status_code=404, detail="Case full text not found")
+        return full_text
+    except HTTPException:
+        # Пробрасываем HTTPException как есть
+        raise
+    except Exception as e:
+        logger.error(f"Error getting case full text: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

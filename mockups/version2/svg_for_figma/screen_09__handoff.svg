@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Підготовка до консультації - /handoff -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран підготовки до консультації">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Підготовка до консультації</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Ми вже зробили основу — далі</text>
+            <text x="42" y="163" fill="rgba(255,255,255,0.64)" font-size="12">підключиться юрист у Telegram</text>
+
+            <rect x="42" y="176" width="306" height="170" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="206" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Що вже готово</text>
+
+            <g fill="rgba(255,255,255,0.84)" font-size="12">
+              <circle cx="66" cy="234" r="8" fill="rgba(34,197,94,0.90)"/>
+              <text x="84" y="238">Документи завантажено (5 шт.)</text>
+
+              <circle cx="66" cy="262" r="8" fill="rgba(34,197,94,0.90)"/>
+              <text x="84" y="266">Чернетку заяви згенеровано</text>
+
+              <circle cx="66" cy="290" r="8" fill="rgba(34,197,94,0.90)"/>
+              <text x="84" y="294">Питання від системи складено</text>
+            </g>
+
+            <rect x="42" y="364" width="306" height="132" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="394" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Питання для юриста</text>
+            <text x="60" y="420" fill="rgba(255,255,255,0.64)" font-size="12">1) Сума боргу і строки?</text>
+            <text x="60" y="442" fill="rgba(255,255,255,0.64)" font-size="12">2) Чи були претензії/переписка?</text>
+            <text x="60" y="464" fill="rgba(255,255,255,0.64)" font-size="12">3) Які докази оплати/отримання?</text>
+
+            <rect x="42" y="512" width="306" height="64" rx="16" fill="#3b82f6"/>
+            <text x="195" y="548" fill="white" font-size="14" font-weight="800" text-anchor="middle">Перейти до консультації</text>
+            <text x="195" y="568" fill="rgba(255,255,255,0.86)" font-size="12" text-anchor="middle">Оплатити й отримати посилання на Telegram-чат</text>
+
+            <text x="42" y="610" fill="rgba(255,255,255,0.46)" font-size="11">Консультація — платний етап. Чернетка й аналіз — безкоштовно.</text>
+
+            <g>
+              <rect x="42" y="682" width="306" height="10" rx="6" fill="rgba(255,255,255,0.10)"/>
+              <rect x="42" y="682" width="254" height="10" rx="6" fill="#3b82f6"/>
+              <text x="42" y="712" fill="rgba(255,255,255,0.46)" font-size="11">Документи → Консультація → Підсумок</text>
+            </g>
+          </svg>

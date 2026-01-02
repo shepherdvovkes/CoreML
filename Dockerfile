@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Создание рабочей директории

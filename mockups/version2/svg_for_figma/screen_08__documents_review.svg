@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Спірні виправлення (OCR) - /documents#review -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран спірних виправлень">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Документи</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Натисніть на картку — покажемо</text>
+            <text x="42" y="163" fill="rgba(255,255,255,0.64)" font-size="12">спірні місця</text>
+
+            <rect x="42" y="176" width="306" height="250" rx="22" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.22)" stroke-dasharray="8 8"/>
+
+            <rect x="70" y="214" width="250" height="96" rx="16" fill="rgba(16,31,58,0.88)" stroke="rgba(245,158,11,0.95)"/>
+            <text x="86" y="242" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Фото_чека.jpg</text>
+            <text x="86" y="264" fill="rgba(245,158,11,0.95)" font-size="11">Є спірні місця</text>
+            <text x="86" y="286" fill="rgba(255,255,255,0.56)" font-size="11">Текст розпізнано невпевнено</text>
+
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(0,0,0,0.35)"/>
+
+            <g>
+              <rect x="30" y="270" width="330" height="468" rx="18" fill="rgba(10,18,34,0.98)" stroke="rgba(255,255,255,0.16)"/>
+              <text x="48" y="304" fill="rgba(255,255,255,0.92)" font-size="14" font-weight="800">Спірні виправлення</text>
+              <text x="48" y="326" fill="rgba(255,255,255,0.56)" font-size="12">Ми не впевнені в розпізнаванні. Оберіть варіант.</text>
+
+              <rect x="48" y="344" width="294" height="116" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="62" y="372" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="700">1) Дата</text>
+              <text x="62" y="392" fill="rgba(255,255,255,0.56)" font-size="11">У тексті: “01.13.2023”</text>
+              <circle cx="70" cy="416" r="8" fill="#3b82f6"/>
+              <text x="86" y="420" fill="rgba(255,255,255,0.86)" font-size="12">01.12.2023</text>
+              <circle cx="200" cy="416" r="8" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.30)"/>
+              <text x="216" y="420" fill="rgba(255,255,255,0.86)" font-size="12">01.13.2023</text>
+
+              <rect x="48" y="472" width="294" height="116" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="62" y="500" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="700">2) Сума</text>
+              <text x="62" y="520" fill="rgba(255,255,255,0.56)" font-size="11">У тексті: “1O0 000”</text>
+              <circle cx="70" cy="544" r="8" fill="#3b82f6"/>
+              <text x="86" y="548" fill="rgba(255,255,255,0.86)" font-size="12">100 000</text>
+              <circle cx="200" cy="544" r="8" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.30)"/>
+              <text x="216" y="548" fill="rgba(255,255,255,0.86)" font-size="12">10 000</text>
+
+              <rect x="48" y="600" width="294" height="78" rx="14" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="62" y="628" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="700">Фрагмент тексту</text>
+              <text x="62" y="650" fill="rgba(255,255,255,0.64)" font-size="11">… дата: 01.13.2023, сума: 1O0 000 …</text>
+              <text x="62" y="670" fill="rgba(255,255,255,0.46)" font-size="11">Можна натиснути й відредагувати вручну</text>
+
+              <rect x="48" y="692" width="182" height="42" rx="14" fill="#3b82f6"/>
+              <text x="139" y="719" fill="white" font-size="12" font-weight="800" text-anchor="middle">Застосувати</text>
+              <rect x="242" y="692" width="100" height="42" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="292" y="719" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650" text-anchor="middle">Правити</text>
+            </g>
+          </svg>

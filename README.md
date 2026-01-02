@@ -26,7 +26,7 @@ CoreML_RAG_MCP_Prompt/
 
 ## Возможности
 
-- **RAG (Retrieval-Augmented Generation)**: Работа с документами (PDF, DOCX, XLSX, TXT)
+- **RAG (Retrieval-Augmented Generation)**: Работа с документами (PDF, DOCX, XLSX, TXT, HTML)
 - **MCP интеграция**: Доступ к базе данных Закон онлайн
 - **Множественные LLM провайдеры**: OpenAI, LMStudio, кастомные API
 - **Автоматическая маршрутизация**: Определение источника данных на основе запроса
@@ -171,7 +171,7 @@ docker-compose up -d
 - `factory.py`: Фабрика для создания провайдеров
 
 ### RAG (`core/rag/`)
-- `document_processor.py`: Обработка документов (PDF, DOCX, XLSX, TXT)
+- `document_processor.py`: Обработка документов (PDF, DOCX, XLSX, TXT, HTML)
 - `vector_store.py`: Векторное хранилище (ChromaDB)
 - `rag_service.py`: Сервис для работы с RAG
 

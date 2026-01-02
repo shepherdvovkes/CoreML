@@ -11,6 +11,8 @@ services:
       - "127.0.0.1:6379:6379"  # Явный bind на localhost для избежания проблем с IPv6
     volumes:
       - redis_data:/data
+    environment:
+      - TZ=Europe/Kiev
     command: redis-server --appendonly yes --bind 0.0.0.0 --protected-mode no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -31,13 +33,47 @@ services:
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
+      - TZ=Europe/Kiev
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - coreml_network
+
+  # Celery Worker для фоновых задач
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    container_name: coreml_celery_worker
+    restart: unless-stopped
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - TZ=Europe/Kiev
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - coreml_network
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./core:/app/core:ro  # Монтируем код для разработки
+      - ./config.py:/app/config.py:ro
+    healthcheck:
+      test: ["CMD", "celery", "-A", "core.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Опционально: Flower для мониторинга Celery
   flower:
@@ -50,11 +86,41 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - TZ=Europe/Kiev
     depends_on:
       - redis
+      - celery_worker
     networks:
       - coreml_network
     command: celery -A core.celery_app flower --port=5555
+
+  # Playwright сервис для скриншотов HTML
+  html_screenshot:
+    build:
+      context: .
+      dockerfile: Dockerfile.playwright
+    container_name: coreml_html_screenshot
+    restart: unless-stopped
+    ports:
+      - "3015:3015"
+    environment:
+      - PORT=3015
+      - HOST=0.0.0.0
+      - VISION_API_URL=${VISION_API_URL:-https://mail.s0me.uk/vision}
+      - VISION_API_KEY=${VISION_API_KEY:-}
+      - TZ=Europe/Kiev
+    volumes:
+      - ./services:/app/services:ro
+      - ./core:/app/core:ro
+      - ./config.py:/app/config.py:ro
+    networks:
+      - coreml_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3015/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   redis_data:

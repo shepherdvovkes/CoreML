@@ -131,6 +131,31 @@ class LawMCPClient:
             logger.error(f"Error extracting case arguments: {e}")
             return {}
     
+    @resilient_mcp(name="mcp_get_case_full_text")
+    async def get_case_full_text(
+        self,
+        doc_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получение полного текста дела по doc_id
+        
+        Args:
+            doc_id: ID документа
+            
+        Returns:
+            Полный текст дела или None
+        """
+        try:
+            response = await self.client.post(
+                "/v1/mcp/get_case_full_text",
+                json={"docId": str(doc_id)}
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error getting case full text: {e}")
+            return None
+    
     async def close(self):
         """Закрытие клиента"""
         await self.client.aclose()

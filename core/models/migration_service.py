@@ -229,15 +229,27 @@ class MigrationService:
         for doc_metadata in documents_metadata:
             # Добавление информации о миграции
             if not dry_run:
+                import json
+                # migration_history хранится как JSON строка для совместимости с ChromaDB
                 if 'migration_history' not in doc_metadata:
-                    doc_metadata['migration_history'] = []
+                    migration_history = []
+                elif isinstance(doc_metadata['migration_history'], str):
+                    try:
+                        migration_history = json.loads(doc_metadata['migration_history'])
+                    except (json.JSONDecodeError, TypeError):
+                        migration_history = []
+                else:
+                    migration_history = list(doc_metadata['migration_history'])
                 
-                doc_metadata['migration_history'].append({
+                migration_history.append({
                     'from_version': from_version,
                     'to_version': to_version,
                     'migrated_at': datetime.utcnow().isoformat(),
                     'model_name': model_name
                 })
+                
+                # Сохраняем как JSON строку
+                doc_metadata['migration_history'] = json.dumps(migration_history)
             
             # Обновление версии модели в метаданных
             doc_metadata['model_version'] = to_version

@@ -55,6 +55,8 @@ curl "http://127.0.0.1:8000/rag/task/abc123-def456-..."
 - PDF файлы
 - Текстовые файлы (.txt, .md)
 - Документы Word (.docx)
+- HTML документы (.html, .htm)
+- Excel файлы (.xlsx, .xls)
 - Другие форматы через DocumentProcessor
 
 ## ⚠️ Текущий статус системы

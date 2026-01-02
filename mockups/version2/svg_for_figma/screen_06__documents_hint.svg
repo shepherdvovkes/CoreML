@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Підказка до документа (popover) - /documents#hint -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран підказки">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Документи</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Натисніть на картку, щоб побачити підказку</text>
+
+            <rect x="42" y="176" width="306" height="250" rx="22" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.22)" stroke-dasharray="8 8"/>
+
+            <rect x="70" y="214" width="250" height="96" rx="16" fill="rgba(16,31,58,0.88)" stroke="rgba(245,158,11,0.95)"/>
+            <text x="86" y="242" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Фото_чека.jpg</text>
+            <text x="86" y="264" fill="rgba(245,158,11,0.95)" font-size="11">Є питання</text>
+            <text x="86" y="286" fill="rgba(255,255,255,0.56)" font-size="11">Дата розпізнана нечітко</text>
+
+            <!-- popover -->
+            <g>
+              <rect x="42" y="348" width="306" height="160" rx="18" fill="rgba(10,18,34,0.95)" stroke="rgba(255,255,255,0.16)"/>
+              <text x="60" y="380" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Підказка системи</text>
+              <text x="60" y="406" fill="rgba(255,255,255,0.64)" font-size="12">У документі дата виглядає як</text>
+              <text x="60" y="426" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">01.13.2023</text>
+              <text x="140" y="426" fill="rgba(255,255,255,0.64)" font-size="12">— можливо, це</text>
+              <text x="248" y="426" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">01.12.2023</text>
+
+              <rect x="60" y="452" width="128" height="42" rx="14" fill="#3b82f6"/>
+              <text x="124" y="478" fill="white" font-size="12" font-weight="700" text-anchor="middle">Підтвердити</text>
+
+              <rect x="200" y="452" width="128" height="42" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="264" y="478" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650" text-anchor="middle">Замінити файл</text>
+
+              <text x="60" y="516" fill="rgba(255,255,255,0.46)" font-size="11">Можна пропустити — обговоримо в чаті</text>
+            </g>
+
+            <rect x="42" y="602" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="637" fill="white" font-size="16" font-weight="700" text-anchor="middle">Продовжити</text>
+
+            <g>
+              <rect x="42" y="682" width="306" height="10" rx="6" fill="rgba(255,255,255,0.10)"/>
+              <rect x="42" y="682" width="210" height="10" rx="6" fill="#3b82f6"/>
+              <text x="42" y="712" fill="rgba(255,255,255,0.46)" font-size="11">Документи → Консультація → Підсумок</text>
+            </g>
+          </svg>

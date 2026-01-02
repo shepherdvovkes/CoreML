@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран 3 — Ваші дані (після Дії) - /profile -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран 4">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Ваші дані</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Автоматично заповнено з Дії. Перевірте та підтвердіть.</text>
+
+            <rect x="42" y="176" width="306" height="74" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="206" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Профіль громадянина</text>
+            <text x="60" y="228" fill="rgba(255,255,255,0.56)" font-size="12">Джерело: Дія • Статус: підтверджено</text>
+            <rect x="278" y="194" width="70" height="34" rx="12" fill="rgba(34,197,94,0.16)" stroke="rgba(34,197,94,0.55)"/>
+            <text x="313" y="216" fill="rgba(255,255,255,0.84)" font-size="11" text-anchor="middle">OK</text>
+
+            <rect x="42" y="266" width="306" height="286" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="296" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Дані для документів</text>
+
+            <g>
+              <rect x="60" y="314" width="270" height="52" rx="14" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="74" y="342" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">ПІБ</text>
+              <text x="74" y="360" fill="rgba(255,255,255,0.46)" font-size="11">(заповнено)</text>
+              <text x="316" y="346" fill="rgba(255,255,255,0.56)" font-size="12" text-anchor="end">▾</text>
+
+              <rect x="60" y="374" width="270" height="52" rx="14" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="74" y="402" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">Дата народження</text>
+              <text x="74" y="420" fill="rgba(255,255,255,0.46)" font-size="11">(заповнено)</text>
+              <text x="316" y="406" fill="rgba(255,255,255,0.56)" font-size="12" text-anchor="end">▾</text>
+
+              <rect x="60" y="434" width="270" height="52" rx="14" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="74" y="462" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">РНОКПП / ІПН</text>
+              <text x="74" y="480" fill="rgba(255,255,255,0.46)" font-size="11">(заповнено)</text>
+              <text x="316" y="466" fill="rgba(255,255,255,0.56)" font-size="12" text-anchor="end">▾</text>
+
+              <rect x="60" y="494" width="270" height="52" rx="14" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="74" y="522" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">Адреса реєстрації</text>
+              <text x="74" y="540" fill="rgba(255,255,255,0.46)" font-size="11">(заповнено)</text>
+              <text x="316" y="526" fill="rgba(255,255,255,0.56)" font-size="12" text-anchor="end">▾</text>
+            </g>
+
+            <rect x="42" y="566" width="306" height="90" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="596" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Контакти</text>
+            <text x="60" y="620" fill="rgba(255,255,255,0.64)" font-size="12">Телефон</text>
+            <text x="330" y="620" fill="rgba(255,255,255,0.84)" font-size="12" text-anchor="end">+380 …</text>
+            <text x="60" y="644" fill="rgba(255,255,255,0.64)" font-size="12">Email</text>
+            <text x="330" y="644" fill="rgba(255,255,255,0.84)" font-size="12" text-anchor="end">…@…</text>
+
+            <rect x="42" y="672" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="707" fill="white" font-size="16" font-weight="700" text-anchor="middle">Підтвердити та далі</text>
+          </svg>

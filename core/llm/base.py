@@ -23,7 +23,7 @@ class LLMResponse(BaseModel):
 class BaseLLMProvider(ABC):
     """Базовый класс для всех LLM провайдеров"""
     
-    def __init__(self, base_url: str, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
+    def __init__(self, base_url: str, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
         self.base_url = base_url
         self.api_key = api_key
         self.model = model

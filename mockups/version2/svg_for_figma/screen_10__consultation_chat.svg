@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Консультація: чат утрьох - /consultation/chat -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран консультації (чат)">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Консультація</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Юрист ставить питання • AI пропонує</text>
+            <text x="42" y="163" fill="rgba(255,255,255,0.64)" font-size="12">відповіді за документами</text>
+
+            <rect x="42" y="176" width="306" height="46" rx="16" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="205" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650">Чат: Юрист • AI • Ви</text>
+            <circle cx="322" cy="199" r="6" fill="rgba(34,197,94,0.90)"/>
+            <text x="330" y="203" fill="rgba(255,255,255,0.56)" font-size="11">online</text>
+
+            <!-- messages area -->
+            <rect x="42" y="236" width="306" height="422" rx="18" fill="rgba(16,31,58,0.35)" stroke="rgba(255,255,255,0.14)"/>
+
+            <!-- lawyer message -->
+            <rect x="60" y="262" width="262" height="94" rx="16" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="76" y="290" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="800">Юрист</text>
+            <text x="76" y="312" fill="rgba(255,255,255,0.72)" font-size="12">Підтвердіть, будь ласка:</text>
+            <text x="76" y="332" fill="rgba(255,255,255,0.72)" font-size="12">коли саме ви отримали</text>
+            <text x="76" y="352" fill="rgba(255,255,255,0.72)" font-size="12">повідомлення/відмову?</text>
+
+            <!-- ai assistant message -->
+            <rect x="60" y="370" width="262" height="156" rx="16" fill="rgba(59,130,246,0.10)" stroke="rgba(59,130,246,0.45)"/>
+            <text x="76" y="398" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="800">AI-асистент</text>
+            <text x="76" y="420" fill="rgba(255,255,255,0.72)" font-size="12">За документами бачу дату:</text>
+            <text x="76" y="442" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">(заповнено)</text>
+            <text x="152" y="442" fill="rgba(255,255,255,0.56)" font-size="12">у листі/акті.</text>
+            <text x="76" y="464" fill="rgba(255,255,255,0.72)" font-size="12">Пропоную відповідь юристу:</text>
+            <rect x="76" y="476" width="230" height="40" rx="12" fill="rgba(16,31,58,0.65)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="90" y="500" fill="rgba(255,255,255,0.84)" font-size="12">«Отримав(ла) повідомлення</text>
+            <text x="90" y="518" fill="rgba(255,255,255,0.84)" font-size="12">(дата)»</text>
+
+            <!-- user confirmation -->
+            <rect x="128" y="542" width="194" height="68" rx="16" fill="rgba(34,197,94,0.14)" stroke="rgba(34,197,94,0.55)"/>
+            <text x="144" y="570" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="800">Ви</text>
+            <text x="144" y="592" fill="rgba(255,255,255,0.72)" font-size="12">Так, це правильно.</text>
+
+            <!-- actions -->
+            <rect x="42" y="676" width="196" height="56" rx="16" fill="#3b82f6"/>
+            <text x="140" y="710" fill="white" font-size="12" font-weight="800" text-anchor="middle">Надіслати юристу</text>
+
+            <rect x="252" y="676" width="96" height="56" rx="16" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="300" y="702" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650" text-anchor="middle">Не так</text>
+            <text x="300" y="722" fill="rgba(255,255,255,0.46)" font-size="11" text-anchor="middle">Уточнити</text>
+          </svg>

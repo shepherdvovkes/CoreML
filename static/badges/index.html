@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Завантажити LexApp - Доступні платформи</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        
+        .badges-section {
+            margin-bottom: 40px;
+        }
+        
+        .badges-section h2 {
+            color: #444;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .badges-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .badge-item {
+            text-align: center;
+        }
+        
+        .badge-item a {
+            display: inline-block;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .badge-item a:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+        
+        .badge-item img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .badge-item svg {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .language-selector {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .language-selector button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s ease;
+        }
+        
+        .language-selector button:hover {
+            background: #764ba2;
+        }
+        
+        .language-selector button.active {
+            background: #764ba2;
+            font-weight: bold;
+        }
+        
+        .badge-group {
+            display: none;
+        }
+        
+        .badge-group.active {
+            display: block;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .badges-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LexApp</h1>
+        <p class="subtitle">Завантажте наш додаток на вашій улюбленій платформі</p>
+        
+        <div class="language-selector">
+            <button onclick="showLanguage('uk')" class="active" id="btn-uk">Українська</button>
+            <button onclick="showLanguage('ru')" id="btn-ru">Русский</button>
+            <button onclick="showLanguage('en')" id="btn-en">English</button>
+        </div>
+        
+        <!-- Ukrainian -->
+        <div class="badge-group active" id="badges-uk">
+            <div class="badges-section">
+                <h2>Android</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="google-play-badge-uk.png" alt="Доступно в Google Play">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>iOS / macOS</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="app-store-badge-uk.svg" alt="Завантажити в App Store">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>Windows</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="microsoft-store-badge-uk.svg" alt="Отримати з Microsoft Store">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>Linux</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="flathub-badge-uk.png" alt="Доступно на Flathub">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Russian -->
+        <div class="badge-group" id="badges-ru">
+            <div class="badges-section">
+                <h2>Android</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="google-play-badge-ru.png" alt="Доступно в Google Play">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>iOS / macOS</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="app-store-badge-ru.svg" alt="Загрузить в App Store">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>Windows</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="microsoft-store-badge-ru.svg" alt="Получить в Microsoft Store">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>Linux</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="flathub-badge-ru.png" alt="Доступно на Flathub">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- English -->
+        <div class="badge-group" id="badges-en">
+            <div class="badges-section">
+                <h2>Android</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="google-play-badge-en.png" alt="Get it on Google Play">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>iOS / macOS</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="app-store-badge-en.svg" alt="Download on the App Store">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>Windows</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="microsoft-store-badge-en.svg" alt="Get it from Microsoft">
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="badges-section">
+                <h2>Linux</h2>
+                <div class="badges-grid">
+                    <div class="badge-item">
+                        <a href="#" target="_blank" rel="noopener noreferrer">
+                            <img src="flathub-badge-en.png" alt="Available on Flathub">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showLanguage(lang) {
+            // Hide all badge groups
+            document.querySelectorAll('.badge-group').forEach(group => {
+                group.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.language-selector button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected language
+            document.getElementById('badges-' + lang).classList.add('active');
+            document.getElementById('btn-' + lang).classList.add('active');
+        }
+    </script>
+</body>
+</html>

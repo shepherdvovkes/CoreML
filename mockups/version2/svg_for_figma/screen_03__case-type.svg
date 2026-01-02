@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран 3 — Що сталося? - /case-type -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран 3">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <!-- top bar -->
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Що сталося?</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Оберіть категорію — це задасть контекст</text>
+            <text x="42" y="163" fill="rgba(255,255,255,0.64)" font-size="12">для аналізу</text>
+
+            <!-- cards grid -->
+            <g>
+              <rect x="42" y="182" width="146" height="92" rx="16" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="56" y="216" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Незаконне</text>
+              <text x="56" y="234" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">звільнення</text>
+              <circle cx="166" cy="214" r="16" fill="rgba(59,130,246,0.20)"/>
+
+              <rect x="202" y="182" width="146" height="92" rx="16" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="216" y="216" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Невиплата</text>
+              <text x="216" y="234" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">зарплати</text>
+              <circle cx="326" cy="214" r="16" fill="rgba(34,197,94,0.16)"/>
+
+              <rect x="42" y="286" width="146" height="92" rx="16" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="56" y="320" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Захист прав</text>
+              <text x="56" y="338" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">споживача</text>
+              <circle cx="166" cy="318" r="16" fill="rgba(245,158,11,0.16)"/>
+
+              <rect x="202" y="286" width="146" height="92" rx="16" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="216" y="320" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">ДТП</text>
+              <text x="216" y="338" fill="rgba(255,255,255,0.64)" font-size="12">та страховка</text>
+              <circle cx="326" cy="318" r="16" fill="rgba(239,68,68,0.14)"/>
+
+              <rect x="42" y="390" width="146" height="92" rx="16" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="56" y="424" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Борг за</text>
+              <text x="56" y="442" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">договором</text>
+              <circle cx="166" cy="422" r="16" fill="rgba(59,130,246,0.18)"/>
+
+              <rect x="202" y="390" width="146" height="92" rx="16" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <text x="216" y="424" fill="rgba(255,255,255,0.92)" font-size="12" font-weight="650">Інше</text>
+              <text x="216" y="442" fill="rgba(255,255,255,0.64)" font-size="12">опишу пізніше</text>
+              <circle cx="326" cy="422" r="16" fill="rgba(255,255,255,0.10)"/>
+            </g>
+
+            <rect x="42" y="512" width="306" height="72" rx="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="56" y="542" fill="rgba(255,255,255,0.84)" font-size="13" font-weight="650">Не знаю, як класифікувати</text>
+            <text x="56" y="564" fill="rgba(255,255,255,0.56)" font-size="12">Підкажемо після завантаження документів</text>
+
+            <rect x="42" y="602" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="637" fill="white" font-size="16" font-weight="700" text-anchor="middle">Продовжити</text>
+
+            <!-- progress -->
+            <g>
+              <rect x="42" y="682" width="306" height="10" rx="6" fill="rgba(255,255,255,0.10)"/>
+              <rect x="42" y="682" width="92" height="10" rx="6" fill="#3b82f6"/>
+              <text x="42" y="712" fill="rgba(255,255,255,0.46)" font-size="11">Документи → Консультація → Підсумок</text>
+            </g>
+          </svg>

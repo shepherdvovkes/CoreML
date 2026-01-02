@@ -289,8 +289,11 @@ class QdrantVectorStore(VectorStoreBase):
             metadata['embedding_model'] = embedding_model_name
             metadata['embedding_model_version'] = model_version or "1.0.0"
             metadata['indexed_at'] = datetime.utcnow().isoformat()
-            if 'migration_history' not in metadata:
-                metadata['migration_history'] = []
+            # Qdrant не поддерживает списки в метаданных, преобразуем в строку
+            if 'migration_history' in metadata and isinstance(metadata['migration_history'], list):
+                metadata['migration_history'] = ','.join(str(x) for x in metadata['migration_history']) if metadata['migration_history'] else ''
+            elif 'migration_history' not in metadata:
+                metadata['migration_history'] = ''
         
         # Генерация ID
         import uuid
@@ -682,8 +685,12 @@ class ChromaVectorStore(VectorStoreBase):
             metadata['embedding_model'] = embedding_model_name
             metadata['embedding_model_version'] = model_version or "1.0.0"
             metadata['indexed_at'] = datetime.utcnow().isoformat()
-            if 'migration_history' not in metadata:
-                metadata['migration_history'] = []
+            # Преобразуем migration_history в JSON строку, если это список
+            if 'migration_history' in metadata and isinstance(metadata['migration_history'], list):
+                import json
+                metadata['migration_history'] = json.dumps(metadata['migration_history'])
+            elif 'migration_history' not in metadata:
+                metadata['migration_history'] = "[]"  # Пустой список как JSON строка
         
         # Генерация ID
         ids = [f"doc_{i}_{hash(doc[:50])}" for i, doc in enumerate(documents)]

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Апеляція: строки й документи - /appeal/form -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран апеляції">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Апеляція</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Зберемо скаргу та пакет додатків</text>
+
+            <rect x="42" y="176" width="306" height="104" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(245,158,11,0.85)"/>
+            <text x="60" y="206" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Дедлайн подачі</text>
+            <text x="60" y="230" fill="rgba(255,255,255,0.64)" font-size="12">Залишилось: 9 днів</text>
+            <text x="60" y="252" fill="rgba(245,158,11,0.95)" font-size="11">Рекомендуємо подати не пізніше: 28.12</text>
+
+            <rect x="42" y="296" width="306" height="250" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="326" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Документи</text>
+            <circle cx="66" cy="356" r="8" fill="rgba(34,197,94,0.90)"/>
+            <text x="84" y="360" fill="rgba(255,255,255,0.84)" font-size="12">Рішення суду (копія)</text>
+            <circle cx="66" cy="384" r="8" fill="rgba(245,158,11,0.95)"/>
+            <text x="84" y="388" fill="rgba(255,255,255,0.84)" font-size="12">Докази (додати)</text>
+            <circle cx="66" cy="412" r="8" fill="rgba(255,255,255,0.30)"/>
+            <text x="84" y="416" fill="rgba(255,255,255,0.84)" font-size="12">Квитанція/збір (за потреби)</text>
+
+            <rect x="60" y="442" width="270" height="44" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="195" y="470" fill="rgba(255,255,255,0.84)" font-size="12" font-weight="650" text-anchor="middle">Додати документ</text>
+            <text x="60" y="510" fill="rgba(255,255,255,0.46)" font-size="11">Підказки по помилках — як у «столі документів»</text>
+
+            <rect x="42" y="584" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="619" fill="white" font-size="16" font-weight="700" text-anchor="middle">Сформувати скаргу</text>
+
+            <text x="42" y="702" fill="rgba(255,255,255,0.46)" font-size="11">Далі: чернетка, консультація, подача і трекінг</text>
+          </svg>

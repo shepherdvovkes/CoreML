@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Екран — Подача й підсумкова оплата - /delivery -->
+<svg viewBox="0 0 390 844" width="100%" height="auto" role="img" aria-label="Екран подачі">
+            <rect x="0" y="0" width="390" height="844" rx="34" fill="#0b1220"/>
+            <rect x="18" y="72" width="354" height="690" rx="26" fill="rgba(15,27,51,0.55)" stroke="rgba(255,255,255,0.14)"/>
+
+            <text x="42" y="118" fill="rgba(255,255,255,0.92)" font-size="18" font-weight="700">Подача до суду</text>
+            <text x="42" y="145" fill="rgba(255,255,255,0.64)" font-size="12">Оберіть спосіб — як в інтернет-магазині</text>
+
+            <!-- options -->
+            <g>
+              <rect x="42" y="176" width="306" height="84" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <circle cx="66" cy="208" r="10" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.30)"/>
+              <text x="88" y="206" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Подам самостійно</text>
+              <text x="88" y="228" fill="rgba(255,255,255,0.56)" font-size="12">Безкоштовно • адреса суду й інструкції</text>
+
+              <rect x="42" y="270" width="306" height="84" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(59,130,246,0.90)"/>
+              <circle cx="66" cy="302" r="10" fill="#3b82f6"/>
+              <text x="88" y="300" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Курʼєр нашої служби</text>
+              <text x="88" y="322" fill="rgba(255,255,255,0.56)" font-size="12">~1–2 дня • 199 ₴</text>
+
+              <rect x="42" y="364" width="306" height="84" rx="18" fill="rgba(16,31,58,0.75)" stroke="rgba(255,255,255,0.14)"/>
+              <circle cx="66" cy="396" r="10" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.30)"/>
+              <text x="88" y="394" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Рекомендованим листом</text>
+              <text x="88" y="416" fill="rgba(255,255,255,0.56)" font-size="12">~3–7 днів • 129 ₴</text>
+            </g>
+
+            <!-- summary -->
+            <rect x="42" y="466" width="306" height="132" rx="18" fill="rgba(16,31,58,0.55)" stroke="rgba(255,255,255,0.14)"/>
+            <text x="60" y="496" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="700">Разом до оплати</text>
+            <text x="60" y="522" fill="rgba(255,255,255,0.64)" font-size="12">Консультація</text>
+            <text x="330" y="522" fill="rgba(255,255,255,0.84)" font-size="12" text-anchor="end">499 ₴</text>
+            <text x="60" y="546" fill="rgba(255,255,255,0.64)" font-size="12">Подача</text>
+            <text x="330" y="546" fill="rgba(255,255,255,0.84)" font-size="12" text-anchor="end">199 ₴</text>
+            <rect x="60" y="558" width="270" height="1" fill="rgba(255,255,255,0.14)"/>
+            <text x="60" y="584" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="800">Усього</text>
+            <text x="330" y="584" fill="rgba(255,255,255,0.92)" font-size="13" font-weight="800" text-anchor="end">698 ₴</text>
+
+            <rect x="42" y="616" width="306" height="56" rx="16" fill="#3b82f6"/>
+            <text x="195" y="651" fill="white" font-size="16" font-weight="700" text-anchor="middle">Оплатити й завершити</text>
+
+            <text x="42" y="702" fill="rgba(255,255,255,0.46)" font-size="11">Після оплати надішлемо PDF і трек-номер на email</text>
+          </svg>

@@ -43,10 +43,19 @@ class Settings(BaseSettings):
     # MCP Configuration
     mcp_law_server_url: str = "https://mcp.lexapp.co.ua/mcp"
     
-    # Google Vision API Configuration
-    vision_api_url: str = "http://mail.s0me.uk:3006"
+    # Google Vision API Configuration (через nginx с HTTPS)
+    vision_api_url: str = "https://mail.s0me.uk/vision"  # HTTPS через nginx
     vision_api_key: str = ""
     vision_api_timeout: int = 120  # 2 minutes for OCR processing
+    
+    # Convert Server Configuration (через nginx с HTTPS)
+    convert_api_url: str = "https://mail.s0me.uk/convert"  # HTTPS через nginx
+    convert_api_key: str = ""
+    convert_api_timeout: int = 300  # 5 minutes for document conversion
+    
+    # HTML Screenshot Service Configuration
+    html_screenshot_url: str = "http://localhost:3015"  # Playwright screenshot service
+    html_screenshot_timeout: int = 120  # 2 minutes for screenshot + OCR
     
     # Text Post-Processing with LLM
     use_llm_text_cleaning: bool = True  # Використовувати LLM для очищення тексту після OCR
